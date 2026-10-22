@@ -1,0 +1,415 @@
+/* Палитра Tokyo Night: тёмный фон, холодные акценты. Цвета вынесены в переменные,
+   чтобы менять тему одним местом. */
+:root {
+  --bg: #1a1b26;
+  --bg-deep: #16161e;
+  --panel: #1f2335;
+  --panel-hi: #292e42;
+  --border: #3b4261;
+  --text: #c0caf5;
+  --muted: #7a84b3;
+  --blue: #7aa2f7;
+  --cyan: #7dcfff;
+  --purple: #bb9af7;
+  --green: #9ece6a;
+  --orange: #ff9e64;
+  --red: #f7768e;
+  --radius: 14px;
+  --gap: 16px;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+body {
+  font: 14px/1.45 var(--sans);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(122, 162, 247, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 110% 0%, rgba(187, 154, 247, 0.10), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+.shell { max-width: 1280px; margin: 0 auto; padding: 18px; display: flex; flex-direction: column; gap: var(--gap); }
+
+/* ── Верхняя панель ─────────────────────────────────────────────────────────────── */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { font-size: 28px; color: var(--purple); text-shadow: 0 0 18px rgba(187, 154, 247, 0.55); }
+h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
+.sub { margin: 2px 0 0; color: var(--muted); font: 12px var(--mono); }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.clock { font: 13px var(--mono); color: var(--muted); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--border);
+  font-size: 12px; color: var(--muted);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 0 transparent; transition: background .3s; }
+.pill.ok .dot { background: var(--green); box-shadow: 0 0 10px var(--green); }
+.pill.ok { color: var(--green); }
+.pill.bad .dot { background: var(--red); box-shadow: 0 0 10px var(--red); }
+.pill.bad { color: var(--red); }
+
+/* ── Общая раскладка ────────────────────────────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-areas:
+    "matrix edid"
+    "matrix net";
+  gap: var(--gap);
+  align-items: start;
+}
+.matrix-panel { grid-area: matrix; }
+.edid-panel { grid-area: edid; }
+.net-panel { grid-area: net; }
+
+.panel {
+  background: linear-gradient(180deg, var(--panel), var(--bg-deep));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  min-width: 0;
+}
+.panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.panel-head h2 {
+  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--cyan);
+}
+.hint { color: var(--muted); font-size: 12px; }
+.error { color: var(--red); font-size: 13px; min-height: 0; margin: 10px 0 0; }
+.error:empty { display: none; }
+
+/* ── Матрица ────────────────────────────────────────────────────────────────────── */
+.matrix {
+  display: grid;
+  grid-template-columns: 84px repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  align-items: center;
+}
+.matrix .head { font: 11px var(--mono); color: var(--muted); text-align: center; padding-bottom: 2px; }
+.matrix .out { font: 600 13px var(--mono); color: var(--text); white-space: nowrap; }
+.matrix .out small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+.cell {
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-deep);
+  color: var(--muted);
+  font: 600 14px var(--mono);
+  cursor: pointer;
+  transition: transform .08s ease, border-color .2s, background .2s, color .2s, box-shadow .2s;
+}
+.cell:hover:not(:disabled) { border-color: var(--blue); color: var(--text); transform: translateY(-1px); }
+.cell.on {
+  background: linear-gradient(180deg, #3d59a1, #2f4a8a);
+  border-color: var(--blue);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(122, 162, 247, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.cell:disabled { cursor: progress; opacity: .55; }
+.cell:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.matrix-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.all-row { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.all-row button {
+  height: 34px; border-radius: 9px; border: 1px dashed var(--border);
+  background: transparent; color: var(--muted); font: 600 12px var(--mono); cursor: pointer;
+}
+.all-row button:hover:not(:disabled) { color: var(--purple); border-color: var(--purple); }
+.all-row button:disabled { opacity: .5; cursor: progress; }
+
+/* ── EDID ───────────────────────────────────────────────────────────────────────── */
+.edid-list { display: flex; flex-direction: column; gap: 10px; }
+/* Каждый вход — <details>: свёрнут до строки-заголовка, раскрывается по клику.
+   Нативный элемент даёт доступность с клавиатуры без своего JS. */
+.edid-row {
+  border-radius: 12px; background: var(--bg-deep); border: 1px solid var(--border);
+  min-width: 0;
+}
+.edid-row[open] { border-color: var(--border-hi, var(--blue)); }
+.edid-row > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; min-width: 0;
+}
+.edid-row > summary::-webkit-details-marker { display: none; }
+.edid-row > summary::after {
+  content: "▸"; margin-left: auto; color: var(--muted); transition: transform .2s ease;
+}
+.edid-row[open] > summary::after { transform: rotate(90deg); }
+.edid-row > summary:hover { color: var(--text); }
+.edid-row > summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; border-radius: 12px; }
+.edid-row .in { font: 600 13px var(--mono); color: var(--cyan); flex: none; }
+.edid-row .sum {
+  font-size: 12px; color: var(--muted); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.edid-row .sum b { color: var(--text); font-weight: 600; }
+.edid-body {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px;
+  padding: 0 12px 12px;
+}
+.edid-body .btn { justify-self: start; }
+.edid-edit { grid-column: 1 / -1; }
+.edid-edit > summary {
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);
+  color: var(--muted); font: 600 12px var(--sans);
+}
+.edid-edit > summary::-webkit-details-marker { display: none; }
+.edid-edit > summary::after { content: "▸"; transition: transform .2s ease; }
+.edid-edit[open] > summary::after { transform: rotate(90deg); }
+.edid-edit > summary:hover { color: var(--text); border-color: var(--blue); }
+.edid-edit > summary.pending { color: var(--orange); border-color: var(--orange); background: rgba(255, 158, 100, 0.12); }
+.edit-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; padding-top: 8px; }
+.edit-grid .btn { justify-self: start; }
+.edit-grid .toggles { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.edid-body .flags { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.edid-body .toggles { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.edid-row .flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.tag {
+  padding: 2px 7px; border-radius: 6px; font: 11px var(--mono);
+  border: 1px solid var(--border); color: var(--muted);
+}
+.tag.on { color: var(--green); border-color: rgba(158, 206, 106, 0.55); }
+
+/* Несохранённые изменения: оранжевый — «это ещё не на матрице». */
+.tag.changed {
+  color: var(--orange); border-color: var(--orange);
+  background: rgba(255, 158, 100, 0.12);
+  box-shadow: 0 0 10px rgba(255, 158, 100, 0.35);
+}
+.edid-row select.changed { border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange); }
+.btn-apply.pending {
+  background: linear-gradient(180deg, #ffb070, #e8844a);
+  border-color: var(--orange); color: #1a1b26;
+  box-shadow: 0 0 14px rgba(255, 158, 100, 0.45);
+}
+.edid-row select, input, .field input {
+  width: 100%; height: 34px; padding: 0 10px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 13px var(--sans);
+}
+.edid-row select:focus, input:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+/* Чекбоксы внутри тегов не должны наследовать размеры текстовых полей. */
+.tag input { width: auto; height: auto; margin: 0 2px 0 0; accent-color: var(--blue); }
+.btn {
+  height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--panel-hi); color: var(--text); font: 600 13px var(--sans); cursor: pointer;
+}
+.btn:hover:not(:disabled) { border-color: var(--blue); }
+.btn:disabled { opacity: .5; cursor: progress; }
+.btn-warn { border-color: rgba(255, 158, 100, 0.55); color: var(--orange); }
+.btn-warn:hover:not(:disabled) { border-color: var(--orange); }
+
+/* ── Сеть ───────────────────────────────────────────────────────────────────────── */
+.net-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.field input { font-family: var(--mono); }
+.field input:disabled { opacity: .45; }
+.check { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
+.check input { width: 16px; height: 16px; accent-color: var(--blue); }
+.net-form .btn { grid-column: 1 / 2; justify-self: start; }
+.warn { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--muted); }
+#macText { font-family: var(--mono); }
+
+/* ── Телефон: всё в один столбец, матрица остаётся 8 колонками ─────────────────── */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "matrix" "edid" "net";
+  }
+}
+@media (max-width: 640px) {
+  .shell { padding: 12px; gap: 12px; }
+  h1 { font-size: 17px; }
+  .panel { padding: 12px; border-radius: 12px; }
+  .matrix { grid-template-columns: 52px repeat(8, minmax(0, 1fr)); gap: 4px; }
+  .matrix .out { font-size: 12px; }
+  .matrix .out small { display: none; }
+  .cell { height: 36px; font-size: 13px; border-radius: 8px; }
+  .all-row { gap: 4px; }
+  .all-row button { height: 30px; font-size: 11px; }
+  .edid-row { grid-template-columns: 52px minmax(0, 1fr); }
+  .edid-row .btn { grid-column: 1 / -1; }
+  .net-form { grid-template-columns: 1fr; }
+  .net-form .btn { grid-column: 1; }
+  .hint { display: none; }
+  .clock { display: none; }
+}
+
+/* ── Несколько матриц, холодный старт и добавление ───────────────────────────────── */
+/* hidden должен побеждать display из классов (например, у .layout). */
+[hidden] { display: none !important; }
+
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab {
+  height: 34px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  font: 600 13px var(--sans); cursor: pointer; max-width: 240px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tab:hover { color: var(--text); border-color: var(--blue); }
+.tab.on {
+  color: #ffffff; border-color: var(--blue);
+  background: linear-gradient(180deg, #3d59a1, #2f4a8a);
+  box-shadow: 0 0 14px rgba(122, 162, 247, 0.35);
+}
+.tab-add { border-style: dashed; color: var(--purple); }
+
+.welcome { max-width: 560px; }
+.welcome h2 { margin: 0 0 10px; font-size: 16px; color: var(--text); }
+.add-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 10px; }
+.add-form .field { flex: 1 1 220px; }
+.btn-primary {
+  height: 36px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--blue);
+  background: linear-gradient(180deg, #3d59a1, #2f4a8a); color: #ffffff; font: 600 13px var(--sans); cursor: pointer;
+}
+.btn-primary:disabled { opacity: .5; cursor: progress; }
+.btn-ghost { background: transparent; border-color: var(--border); color: var(--muted); }
+.btn-ghost:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
+.danger-zone { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* ── Доступность матриц: зелёное свечение — на связи, оранжевое мигание — нет связи ── */
+.tab.online {
+  color: var(--green); border-color: rgba(158, 206, 106, 0.7);
+  box-shadow: 0 0 12px rgba(158, 206, 106, 0.55);
+}
+.tab.offline {
+  color: var(--orange); border-color: var(--orange);
+  box-shadow: 0 0 12px rgba(255, 158, 100, 0.6);
+  animation: tab-blink 2.4s ease-in-out infinite;
+}
+/* Плавный пульс: свечение и прозрачность меняются синусоидально, без скачков. */
+@keyframes tab-blink {
+  0%, 100% { box-shadow: 0 0 14px rgba(255, 158, 100, 0.7); opacity: 1; }
+  50% { box-shadow: 0 0 3px rgba(255, 158, 100, 0.15); opacity: 0.6; }
+}
+/* Для пользователей, которым мигание мешает, индикатор остаётся статичным. */
+@media (prefers-reduced-motion: reduce) {
+  .tab.offline { animation: none; }
+}
+
+/* ── Состояния просмотра матрицы: загрузка, нет связи, устаревшие данные ─────────── */
+.matrix-panel, .edid-panel { position: relative; }
+.loader {
+  position: absolute; inset: 0; z-index: 5; border-radius: var(--radius);
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  background: rgba(26, 27, 38, 0.72); backdrop-filter: blur(2px);
+  color: var(--muted); font-size: 13px;
+}
+.spin {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--cyan);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#workspace[data-state="loading"] .loader,
+#workspace[data-state="offline"] .loader { display: flex; }
+#workspace[data-state="offline"] .spin { display: none; }
+#workspace[data-state="offline"] .loader-text { color: var(--red); }
+/* Пока данных нет, никаких «зелёных» ячеек от прошлой матрицы не остаётся. */
+#workspace[data-state="loading"] .matrix,
+#workspace[data-state="offline"] .matrix,
+#workspace[data-state="loading"] .edid-list,
+#workspace[data-state="offline"] .edid-list { opacity: 0.25; filter: grayscale(1); pointer-events: none; }
+/* Нет связи, но последние данные ещё есть: показываем их приглушённо. */
+#workspace[data-state="stale"] .matrix,
+#workspace[data-state="stale"] .edid-list { opacity: 0.5; }
+
+/* ── Модальное подтверждение в стиле стекла ─────────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(10, 11, 18, 0.45);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: modal-fade 0.18s ease-out;
+}
+.modal-card {
+  width: 100%; max-width: 380px; padding: 22px 22px 18px;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(41, 46, 66, 0.82), rgba(27, 30, 46, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  animation: modal-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.modal-card h3 { margin: 0 0 8px; font-size: 16px; color: var(--text); }
+.modal-card p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.btn-danger {
+  height: 36px; padding: 0 16px; border-radius: 9px;
+  border: 1px solid rgba(247, 118, 142, 0.6);
+  background: linear-gradient(180deg, rgba(247, 118, 142, 0.35), rgba(247, 118, 142, 0.18));
+  color: #ffe4ea; font: 600 13px var(--sans); cursor: pointer;
+}
+.btn-danger:hover { border-color: var(--red); box-shadow: 0 0 14px rgba(247, 118, 142, 0.4); }
+.modal .btn-ghost { height: 36px; padding: 0 16px; border-radius: 9px; }
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-pop { from { opacity: 0; transform: translateY(8px) scale(0.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .modal, .modal-card { animation: none; }
+}
+
+/* ── Переключатель языка: плашка справа от связи, выпадающий список в стиле стекла ── */
+.lang { position: relative; }
+.lang-btn { gap: 8px; cursor: pointer; }
+.lang-btn:hover { border-color: var(--blue); color: var(--text); }
+.lang-flag { font-size: 15px; line-height: 1; }
+.lang-code { font: 600 12px var(--mono); letter-spacing: 0.04em; }
+.lang-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 50;
+  min-width: 210px; padding: 6px; border-radius: 16px;
+  background: linear-gradient(160deg, rgba(41, 46, 66, 0.9), rgba(27, 30, 46, 0.86));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  animation: modal-pop 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.lang-menu[hidden] { display: none !important; }
+.lang-item {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--text); font: 13px var(--sans); cursor: pointer; text-align: left;
+}
+.lang-item:hover { background: rgba(122, 162, 247, 0.12); }
+.lang-item.on { background: rgba(122, 162, 247, 0.22); }
+.lang-item .lang-name { flex: 1; }
+.lang-item .lang-code { color: var(--muted); }
+
+/* ── Флаги языков: SVG-файлы из static/flags ─────────────────────────────────────── */
+.flag-img { display: block; width: 22px; height: 15px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15); }
+
+/* ── Поиск матриц в сети ───────────────────────────────────────────────────────── */
+.scan { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.scan h3 { margin: 0 0 6px; font-size: 14px; color: var(--text); }
+.scan-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
+.scan-form .field { flex: 1 1 200px; }
+.scan-form .scan-port { flex: 0 0 110px; }
+.scan-results { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.scan-results:empty { display: none; }
+.scan-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; background: var(--bg-deep); border: 1px solid var(--border);
+}
+.scan-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.scan-info b { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-meta { font: 12px var(--mono); color: var(--muted); }
+.scan-badge { font: 600 11px var(--mono); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+.scan-badge.new { color: var(--green); border-color: rgba(158, 206, 106, 0.6); }
+.scan-badge.known { color: var(--muted); }
+.scan-item .btn { height: 32px; padding: 0 12px; }
+
+/* ── Подсказка формата в пустых полях: плейсхолдер виден и читается ─────────────── */
+input::placeholder {
+  color: var(--cyan);
+  opacity: 0.9;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+input:focus::placeholder { opacity: 0.4; }

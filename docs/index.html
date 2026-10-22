@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hdmi-matrix-web-controller: standalone web UI for HDMI 8×8 matrix switchers (ZENTY ZT-MT88A), local networks only</title>
+<meta name="description" content="Standalone micro-service with a web UI for network-controlled HDMI 8×8 matrix switchers such as the ZENTY ZT-MT88A (ZT-115). For local networks only. Open source, MIT.">
+<meta name="keywords" content="HDMI matrix, HDMI 8x8 matrix, HDMI matrix switcher web UI, ZENTY ZT-MT88A, ZENTY ZT-115, HDMI routing, EDID management, network HDMI matrix control, local network, open source">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Kostiantyn Meshchsriakov">
+<meta name="application-name" content="hdmi-matrix-web-controller">
+<link rel="canonical" href="https://mr-addams.github.io/hdmi-matrix-web-controller/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 29 16 16 29 3 16z' fill='%23bb9af7'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="hdmi-matrix-web-controller">
+<meta property="og:title" content="hdmi-matrix-web-controller: web UI for HDMI 8×8 matrix switchers">
+<meta property="og:description" content="Standalone micro-service for managing HDMI 8×8 matrix switchers (e.g. ZENTY ZT-MT88A) in local networks only.">
+<meta property="og:url" content="https://mr-addams.github.io/hdmi-matrix-web-controller/">
+<meta property="og:image" content="https://mr-addams.github.io/hdmi-matrix-web-controller/screenshots/routing-and-network.png">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="uk_UA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="hdmi-matrix-web-controller: web UI for HDMI 8×8 matrix switchers">
+<meta name="twitter:description" content="Standalone micro-service for managing HDMI 8×8 matrix switchers (e.g. ZENTY ZT-MT88A) in local networks only.">
+<meta name="twitter:image" content="https://mr-addams.github.io/hdmi-matrix-web-controller/screenshots/routing-and-network.png">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "hdmi-matrix-web-controller", "description": "Standalone micro-service with a web UI for network-controlled HDMI 8×8 matrix switchers such as the ZENTY ZT-MT88A (ZT-115). For local networks only. Open source, MIT.", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Docker, any modern web browser", "license": "https://opensource.org/licenses/MIT", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "author": {"@type": "Person", "name": "Kostiantyn Meshchsriakov"}, "codeRepository": "https://github.com/mr-addams/hdmi-matrix-web-controller", "url": "https://mr-addams.github.io/hdmi-matrix-web-controller/", "inLanguage": ["en", "uk"], "keywords": "HDMI matrix, HDMI 8x8 matrix, HDMI matrix switcher web UI, ZENTY ZT-MT88A, ZENTY ZT-115, HDMI routing, EDID management, network HDMI matrix control, local network, open source", "screenshot": "https://mr-addams.github.io/hdmi-matrix-web-controller/screenshots/routing-and-network.png"}</script>
+<style>
+  :root {
+    --bg: #1a1b26; --panel: #1f2335; --line: #3b4261; --text: #c0caf5; --muted: #7a84b3;
+    --blue: #7aa2f7; --cyan: #7dcfff; --purple: #bb9af7; --orange: #ff9e64;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: var(--mono); font-size: 14px; }
+  pre { background: #16161e; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  header.hero { padding: 40px 0 40px; background: radial-gradient(900px 400px at 15% -10%, rgba(122,162,247,.18), transparent 60%), radial-gradient(700px 360px at 95% 0%, rgba(187,154,247,.14), transparent 55%); }
+  .topline { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .kicker { color: var(--purple); font: 600 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  h1 { margin: 22px 0 14px; font-size: clamp(30px, 5vw, 44px); line-height: 1.15; }
+  .lead { color: var(--muted); font-size: 18px; max-width: 720px; margin: 0 0 22px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-block; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); font-weight: 600; }
+  .btn.primary { background: linear-gradient(180deg, #3d59a1, #2f4a8a); border-color: var(--blue); color: #fff; }
+  .btn:hover { text-decoration: none; border-color: var(--blue); }
+  section { padding: 44px 0; border-top: 1px solid var(--line); }
+  h2 { margin: 0 0 16px; font-size: 24px; }
+  p { margin: 0 0 14px; }
+  .muted { color: var(--muted); }
+  .shot { margin: 0 0 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot figcaption { padding: 10px 14px; color: var(--muted); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 17px; color: var(--cyan); }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .note { border-left: 3px solid var(--orange); background: rgba(255,158,100,.08); padding: 12px 16px; border-radius: 8px; color: var(--text); }
+  footer { padding: 28px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer nav a { margin-right: 16px; }
+
+  /* Переключение языка только средствами CSS: скрытые радиокнопки и :checked.
+     Русских текстов нет: на сайте English и Українська. */
+  .lang-switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .lang-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .lang-switch label { padding: 6px 14px; cursor: pointer; color: var(--muted); font: 600 13px var(--mono); }
+  .lang-switch label + label { border-left: 1px solid var(--line); }
+  #lang-en:checked ~ header label[for="lang-en"],
+  #lang-uk:checked ~ header label[for="lang-uk"] { background: #2f4a8a; color: #fff; }
+  #lang-en:checked ~ * .uk,
+  #lang-uk:checked ~ * .en { display: none; }
+  .lang-switch input:focus-visible + label { outline: 2px solid var(--cyan); }
+  .scope { color: var(--cyan); font-weight: 600; margin: 0 0 16px; }
+  table.devices { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 15px; margin-bottom: 14px; }
+  table.devices th, table.devices td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.devices th { color: var(--cyan); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+  table.devices tr:last-child td { border-bottom: 0; }
+  @media (max-width: 640px) { table.devices thead { display: none; } table.devices td { display: block; border-bottom: 0; padding: 6px 14px; } table.devices tr { display: block; border-bottom: 1px solid var(--line); padding: 8px 0; } }
+</style>
+</head>
+<body>
+
+<input type="radio" name="lang" id="lang-en" checked>
+<input type="radio" name="lang" id="lang-uk">
+
+<header class="hero">
+  <div class="wrap">
+    <div class="topline">
+      <div class="kicker"><span class="en">open source · MIT</span><span class="uk">відкрите ПЗ · MIT</span></div>
+      <div class="lang-switch" role="group" aria-label="Language">
+        <label for="lang-en">EN</label>
+        <label for="lang-uk">УК</label>
+      </div>
+    </div>
+    <h1>hdmi-matrix-web-controller</h1>
+    <p class="scope">
+      <span class="en">A standalone micro-service for managing HDMI matrix switchers in local networks only.</span>
+      <span class="uk">Окремий мікросервіс для керування HDMI-матрицями лише в локальних мережах.</span>
+    </p>
+    <p class="lead">
+      <span class="en">A fast single-page web UI, a standalone micro-service for network-controlled HDMI 8×8 matrix switchers such as the ZENTY ZT-MT88A. Built as a replacement for the device's built-in web interface, which works but is hard to use. For local networks only.</span>
+      <span class="uk">Швидкий односторінковий веб-інтерфейс, окремий мікросервіс для HDMI-матриць 8×8 з керуванням по мережі, наприклад ZENTY ZT-MT88A. Створений як заміна вбудованого веб-інтерфейсу пристрою, який працює, але незручний. Лише для локальних мереж.</span>
+    </p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/mr-addams/hdmi-matrix-web-controller">
+        <span class="en">View on GitHub</span><span class="uk">Переглянути на GitHub</span>
+      </a>
+      <a class="btn" href="#quick-start">
+        <span class="en">Quick start</span><span class="uk">Швидкий старт</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2><span class="en">Screens</span><span class="uk">Скриншоти</span></h2>
+    <figure class="shot">
+      <img src="screenshots/routing-and-network.png" alt="Routing grid, EDID and network settings on one screen" loading="lazy">
+      <figcaption>
+        <span class="en">Routing, EDID and network settings for the selected matrix, on one screen.</span>
+        <span class="uk">Маршрутизація, EDID і мережеві налаштування вибраної матриці на одному екрані.</span>
+      </figcaption>
+    </figure>
+    <div class="grid">
+      <figure class="shot">
+        <img src="screenshots/add-and-scan.png" alt="Add a matrix by IP and scan a network" loading="lazy">
+        <figcaption>
+          <span class="en">Add a matrix by IP, or scan a private network for compatible ones.</span>
+          <span class="uk">Додавання матриці за IP або пошук сумісних пристроїв у мережі.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/edid-panel.png" alt="EDID panel with per-input editing" loading="lazy">
+        <figcaption>
+          <span class="en">Per-input EDID with pending changes highlighted before you apply them.</span>
+          <span class="uk">EDID для кожного входу; несохранені зміни підсвічуються до застосування.</span>
+        </figcaption>
+      </figure>
+    </div>
+    <figure class="shot">
+      <img src="screenshots/language-menu.png" alt="Language picker with eleven languages" loading="lazy">
+      <figcaption>
+        <span class="en">Eleven interface languages; English is the default.</span>
+        <span class="uk">Одинадцять мов інтерфейсу; типова — англійська.</span>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2><span class="en">What it does</span><span class="uk">Що вміє</span></h2>
+    <p><span class="en">A micro-service that runs next to your matrices on a local network and gives you one page to route inputs, set EDID and configure the device.</span><span class="uk">Мікросервіс, який працює поруч із вашими матрицями в локальній мережі і дає одну сторінку, щоб перемикати входи, налаштовувати EDID і пристрій.</span></p>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="en">One page</span><span class="uk">Одна сторінка</span></h3>
+        <p><span class="en">Routing, EDID and network settings for the selected matrix are visible together, without switching between pages.</span><span class="uk">Маршрутизація, EDID і мережеві налаштування вибраної матриці видно разом, без перемикання сторінок.</span></p>
+      </div>
+      <div class="card">
+        <h3><span class="en">Several matrices</span><span class="uk">Кілька матриць</span></h3>
+        <p><span class="en">Add as many as you need. Each is identified by its MAC address, so changing an IP keeps its settings.</span><span class="uk">Додавайте скільки потрібно. Кожна ідентифікується за MAC-адресою, тож зміна IP не скидає налаштування.</span></p>
+      </div>
+      <div class="card">
+        <h3><span class="en">Network discovery</span><span class="uk">Пошук у мережі</span></h3>
+        <p><span class="en">Scan a private /24 on any port for compatible devices. The scan only reads; it never switches anything.</span><span class="uk">Скануйте приватну /24 на будь-якому порту. Скан лише читає й нічого не перемикає.</span></p>
+      </div>
+      <div class="card">
+        <h3><span class="en">Status at a glance</span><span class="uk">Статус одразу</span></h3>
+        <p><span class="en">Each tab shows whether its matrix is reachable. Unreachable matrices are marked clearly.</span><span class="uk">Кожна вкладка показує, чи доступна її матриця.</span></p>
+      </div>
+      <div class="card">
+        <h3><span class="en">Runs in a container</span><span class="uk">Працює в контейнері</span></h3>
+        <p><span class="en">A small nginx image serves the page and proxies requests to your matrices. Nothing leaves your network.</span><span class="uk">Невеликий образ nginx віддає сторінку й проксує запити до ваших матриць. Нічого не виходить за межі вашої мережі.</span></p>
+      </div>
+      <div class="card">
+        <h3><span class="en">Plain web stack</span><span class="uk">Простий веб-стек</span></h3>
+        <p><span class="en">Static HTML, CSS and ES modules. No build step, no framework, no external CDN.</span><span class="uk">Статичні HTML, CSS і ES-модулі. Без збірки, фреймворків і зовнішніх CDN.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="quick-start">
+  <div class="wrap">
+    <h2><span class="en">Quick start</span><span class="uk">Швидкий старт</span></h2>
+    <p class="muted"><span class="en">You need Docker with the Compose plugin and a matrix reachable on your network.</span><span class="uk">Потрібні Docker з плагіном Compose і матриця, доступна у вашій мережі.</span></p>
+<pre><code>git clone https://github.com/mr-addams/hdmi-matrix-web-controller.git
+cd hdmi-matrix-web-controller
+cp .env.example .env        # change UI_PASSWORD first
+docker compose up -d --build</code></pre>
+    <p><span class="en">Open <code>http://127.0.0.1:8080</code>, sign in, and add a matrix by its IP address.</span><span class="uk">Відкрийте <code>http://127.0.0.1:8080</code>, увійдіть і додайте матрицю за IP-адресою.</span></p>
+    <p class="note">
+      <span class="en"><strong>Security:</strong> matrices have no authentication for their web API. Keep them on a trusted network, change the default page password, and read the security notes in the README before publishing the page on your LAN.</span><span class="uk"><strong>Безпека:</strong> матриці не мають автентифікації для веб-API. Тримайте їх у довіреній мережі, змініть типовий пароль сторінки й прочитайте розділ безпеки в README, перш ніж публікувати сторінку в локальній мережі.</span>
+    </p>
+  </div>
+</section>
+
+<section id="devices">
+  <div class="wrap">
+    <h2><span class="en">Supported devices</span><span class="uk">Підтримувані пристрої</span></h2>
+    <p><span class="en">The micro-service was built and tested against the device below. Discovery accepts only devices that answer like it does.</span><span class="uk">Мікросервіс створено і перевірено на пристрої нижче. Пошук приймає лише пристрої, які відповідають так само.</span></p>
+    <table class="devices">
+      <thead>
+        <tr>
+          <th><span class="en">Device</span><span class="uk">Пристрій</span></th>
+          <th><span class="en">Status</span><span class="uk">Статус</span></th>
+          <th><span class="en">Notes</span><span class="uk">Примітки</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>ZENTY ZT-MT88A</strong> <span class="muted">(ZT-115)</span></td>
+          <td><span class="en">Tested</span><span class="uk">Перевірено</span></td>
+          <td>
+            <span class="en">8×8 HDMI 2.0 matrix, HTTP API on port 80, device name <code>8*8HDMI2.0Matrix</code>, firmware 1.04.</span>
+            <span class="uk">Матриця 8×8 HDMI 2.0, HTTP API на порту 80, назва пристрою <code>8*8HDMI2.0Matrix</code>, прошивка 1.04.</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span class="en">Similar 8×8 HDMI matrices, for example Monoprice Blackbird 4K 8×8 or OREI UHD-808</span>
+            <span class="uk">Схожі HDMI-матриці 8×8, наприклад Monoprice Blackbird 4K 8×8 або OREI UHD-808</span>
+          </td>
+          <td><span class="en">Not tested</span><span class="uk">Не перевірено</span></td>
+          <td>
+            <span class="en">Other vendors use other control protocols. The discovery step will not recognise them, so they are not supported.</span>
+            <span class="uk">Інші виробники використовують інші протоколи керування. Пошук їх не розпізнає, тож вони не підтримуються.</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="muted"><span class="en">ZENTY and ZT-MT88A are trademarks of their owner. This project is not affiliated with the vendor.</span><span class="uk">ZENTY і ZT-MT88A — торгові марки їхнього власника. Проєкт не пов'язаний з виробником.</span></p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <nav>
+      <a href="https://github.com/mr-addams/hdmi-matrix-web-controller"><span class="en">Repository</span><span class="uk">Репозиторій</span></a>
+      <a href="https://github.com/mr-addams/hdmi-matrix-web-controller/blob/main/docs/PROTOCOL.md"><span class="en">Protocol notes</span><span class="uk">Нотатки про протокол</span></a>
+      <a href="https://github.com/mr-addams/hdmi-matrix-web-controller/blob/main/CONTRIBUTING.md"><span class="en">Contributing</span><span class="uk">Участь у розробці</span></a>
+      <a href="https://github.com/mr-addams/hdmi-matrix-web-controller/issues">Issues</a>
+      <a href="https://github.com/mr-addams/hdmi-matrix-web-controller/blob/main/README.uk.md">README (УК)</a>
+    </nav>
+    <p style="margin-top:12px"><span class="en">MIT License. A standalone micro-service for HDMI matrix switchers, for local networks only.</span><span class="uk">Ліцензія MIT. Окремий мікросервіс для HDMI-матриць, лише для локальних мереж.</span></p>
+  </div>
+</footer>
+
+</body>
+</html>

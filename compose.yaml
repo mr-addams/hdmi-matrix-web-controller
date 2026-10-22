@@ -1,0 +1,18 @@
+# Страница управления HDMI-матрицами. Матрицы добавляются уже из интерфейса,
+# поэтому адреса здесь не задаются.
+#
+# Запуск:  cp .env.example .env   # поменяй UI_PASSWORD
+#          docker compose up -d --build
+services:
+  matrix-ui:
+    build: .
+    ports:
+      # По умолчанию только loopback: у матриц нет аутентификации.
+      - "${MATRIX_UI_BIND:-127.0.0.1}:${MATRIX_UI_PORT:-8080}:80"
+    environment:
+      UI_USER: ${UI_USER:-admin}
+      UI_PASSWORD: ${UI_PASSWORD:-matrix}
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./static:/usr/share/nginx/html:ro
+    restart: unless-stopped

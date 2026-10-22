@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mr-addams.github.io/hdmi-matrix-web-controller/sitemap.xml
