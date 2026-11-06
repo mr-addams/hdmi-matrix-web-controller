@@ -37,8 +37,12 @@ EOF
   cat > "$CASE_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 echo "curl $*" >> "$STUB_LOG"
-echo "curl-config: $(cat)" >> "$STUB_LOG"
-printf '%s' "${FAKE_HTTP_CODE:-200}"
+config=$(cat)
+echo "curl-config: $config" >> "$STUB_LOG"
+# Вход в установщике проверяет редирект: по умолчанию имитируем успешный вход на главную.
+if [ -n "${FAKE_HTTP_CODE:-}" ]; then printf '%s' "$FAKE_HTTP_CODE"; exit 0; fi
+base=$(printf '%s\n' "$config" | sed -n 's|^url = "\(.*\)/login"$|\1|p')
+printf '303 %s/' "$base"
 EOF
   chmod +x "$CASE_DIR/bin/docker" "$CASE_DIR/bin/curl"
   STUB_LOG="$CASE_DIR/stub.log"
@@ -127,7 +131,7 @@ if grep '^curl ' "$STUB_LOG" | grep -qF "s3cret"; then
 else
   pass "пароль не попадает в аргументы curl"
 fi
-expect_log "curl-config: user = \"ops:s3cret\"" "пароль передаётся curl через stdin"
+expect_log "data-urlencode = \"password=s3cret\"" "пароль передаётся curl через stdin"
 
 make_case
 run_install
@@ -143,9 +147,9 @@ expect_output "Логин: admin" "логин по умолчанию admin"
 # ── Ошибки контейнера ──
 
 make_case
-FAKE_HTTP_CODE=401 run_install --password s3cret
-expect_rc 1 "неверный логин в контейнере даёт код 1"
-expect_output "последний HTTP-код: 401" "при 401 сообщение называет код"
+FAKE_HTTP_CODE="303 http://127.0.0.1:8080/login?error=1" run_install --password s3cret
+expect_rc 1 "неверный пароль в контейнере даёт код 1"
+expect_output "Вход отклонён" "неверный пароль назван отказом входа"
 
 make_case
 FAKE_DOCKER_EXIT=1 run_install --password s3cret

@@ -90,5 +90,14 @@
   "scan.errTooLarge": "范围过大：每次扫描最多 /24",
   "scan.errBadRange": "请输入类似 192.168.1.0/24 的网络",
   "scan.errNotPrivate": "只能扫描私有网络（10.x、192.168.x、172.16–31.x）",
-  "err.port": "端口必须是 1 到 65535 之间的数字"
+  "err.port": "端口必须是 1 到 65535 之间的数字",
+  "io.tagPlaceholder": "新标记",
+  "io.tagAdd": "添加",
+  "io.tagRemove": "移除标记 {tag}",
+  "io.limit": "最多 {max} 个标记",
+  "io.edit": "编辑",
+  "io.label": "标签名称",
+  "io.tags": "标记",
+  "io.save": "保存",
+  "auth.logout": "退出"
 }

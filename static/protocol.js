@@ -12,7 +12,7 @@ export const AUDIO_MODES = ["2.0", "5.1", "7.1"];
 
 const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
-// Совпадает с правилом в nginx.conf: прокси не ходит за пределы приватных сетей.
+// Совпадает с правилом в proxy.go: прокси не ходит за пределы приватных сетей.
 export function isPrivateIpv4(ip) {
   const match = IPV4.exec(ip);
   if (!match) return false;

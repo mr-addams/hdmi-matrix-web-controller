@@ -19,6 +19,9 @@
       </div>
     </div>
     <div class="topbar-right">
+      <form method="post" action="logout" class="logout-form">
+        <button type="submit" class="pill lang-btn" data-i18n="auth.logout">Sign out</button>
+      </form>
       <span class="pill" id="linkPill"><span class="dot"></span><span id="linkText" data-i18n="link.nodata">нет данных</span></span>
       <div class="lang">
         <button type="button" class="pill lang-btn" id="langBtn" aria-haspopup="listbox" aria-expanded="false">
@@ -88,25 +91,26 @@
       <p class="error" id="routeError" role="alert"></p>
     </section>
 
-    <section class="panel edid-panel">
+    <div class="side">
+    <details class="panel collapsible edid-panel" id="edidPanel">
+      <summary class="panel-head">
+        <h2 data-i18n="edid.title">EDID входов</h2>
+        <span class="hint" data-i18n="edid.hint">что видит источник</span>
+      </summary>
       <div class="loader" aria-live="polite">
         <span class="spin"></span>
         <span class="loader-text"></span>
         <button type="button" class="btn btn-primary loader-action" data-i18n="loader.setAddress" hidden>Указать новый адрес</button>
       </div>
-      <div class="panel-head">
-        <h2 data-i18n="edid.title">EDID входов</h2>
-        <span class="hint" data-i18n="edid.hint">что видит источник</span>
-      </div>
       <div class="edid-list" id="edidList"></div>
       <p class="error" id="edidError" role="alert"></p>
-    </section>
+    </details>
 
-    <section class="panel net-panel">
-      <div class="panel-head">
+    <details class="panel collapsible net-panel" id="netPanel">
+      <summary class="panel-head">
         <h2 data-i18n="net.title">Сеть</h2>
         <span class="hint" id="macText"></span>
-      </div>
+      </summary>
       <form id="netForm" class="net-form" autocomplete="off">
         <label class="field">
           <span data-i18n="net.name">Имя устройства</span>
@@ -135,10 +139,41 @@
       <div class="danger-zone">
         <button type="button" class="btn btn-ghost" id="removeBtn" data-i18n="net.remove">Убрать матрицу из списка</button>
       </div>
-    </section>
+    </details>
+    </div>
+
 
   </main>
 
+</div>
+
+<!-- Меню правого клика по заголовку входа или выхода. Позицию ставит JS. -->
+<div class="io-menu" id="ioMenu" hidden>
+  <button type="button" class="io-menu-item" id="ioMenuEdit"></button>
+</div>
+
+<!-- Редактор подписи и тегов: в стиле стекла, правки применяются только по «Сохранить». -->
+<div class="modal" id="ioModal" hidden>
+  <form class="modal-card io-editor" id="ioForm" autocomplete="off">
+    <h3 id="ioTitle"></h3>
+    <label class="field">
+      <span data-i18n="io.label">Подпись</span>
+      <input id="ioLabel" maxlength="32">
+    </label>
+    <div class="field">
+      <span data-i18n="io.tags">Теги</span>
+      <div class="io-tags-edit" id="ioTags"></div>
+      <div class="io-add">
+        <input id="ioTagInput" maxlength="16" data-i18n-placeholder="io.tagPlaceholder" placeholder="Новый тег">
+        <button type="button" class="btn" id="ioTagAdd" data-i18n="io.tagAdd">Добавить</button>
+      </div>
+    </div>
+    <p class="error" id="ioError" role="alert"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="ioCancel" data-i18n="confirm.cancel">Отмена</button>
+      <button type="submit" class="btn btn-primary" data-i18n="io.save">Сохранить</button>
+    </div>
+  </form>
 </div>
 
 <!-- Подтверждение в стиле стекла вместо системного окна. -->

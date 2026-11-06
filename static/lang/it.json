@@ -90,5 +90,14 @@
   "scan.errTooLarge": "Intervallo troppo grande: al massimo /24",
   "scan.errBadRange": "Inserisci una rete come 192.168.1.0/24",
   "scan.errNotPrivate": "Si possono analizzare solo reti private (10.x, 192.168.x, 172.16–31.x)",
-  "err.port": "la porta deve essere un numero da 1 a 65535"
+  "err.port": "la porta deve essere un numero da 1 a 65535",
+  "io.tagPlaceholder": "Nuovo tag",
+  "io.tagAdd": "Aggiungi",
+  "io.tagRemove": "Rimuovi il tag {tag}",
+  "io.limit": "Massimo {max} tag",
+  "io.edit": "Modifica",
+  "io.label": "Etichetta",
+  "io.tags": "Tag",
+  "io.save": "Salva",
+  "auth.logout": "Esci"
 }

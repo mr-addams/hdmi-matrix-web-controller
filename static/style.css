@@ -58,15 +58,13 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  grid-template-areas:
-    "matrix edid"
-    "matrix net";
+  grid-template-areas: "matrix side";
   gap: var(--gap);
   align-items: start;
 }
 .matrix-panel { grid-area: matrix; }
-.edid-panel { grid-area: edid; }
-.net-panel { grid-area: net; }
+/* EDID и «Сеть» — в одном столбце: свёрнутые панели не должны оставлять пустоту между собой. */
+.side { grid-area: side; display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 
 .panel {
   background: linear-gradient(180deg, var(--panel), var(--bg-deep));
@@ -85,6 +83,17 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .error { color: var(--red); font-size: 13px; min-height: 0; margin: 10px 0 0; }
 .error:empty { display: none; }
 
+/* ── Сворачиваемые панели EDID и «Сеть» ───────────────────────────────────────────── */
+/* Заголовок — это <summary>: клик и Enter раскрывают панель, без своего JS. */
+.collapsible > summary { list-style: none; cursor: pointer; }
+.collapsible > summary::-webkit-details-marker { display: none; }
+.collapsible > summary::after {
+  content: "▸"; color: var(--muted); margin-left: 4px; transition: transform .2s ease;
+}
+.collapsible[open] > summary::after { transform: rotate(90deg); }
+.collapsible:not([open]) > summary { margin-bottom: 0; }
+.collapsible > summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 8px; }
+
 /* ── Матрица ────────────────────────────────────────────────────────────────────── */
 .matrix {
   display: grid;
@@ -95,6 +104,15 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .matrix .head { font: 11px var(--mono); color: var(--muted); text-align: center; padding-bottom: 2px; }
 .matrix .out { font: 600 13px var(--mono); color: var(--text); white-space: nowrap; }
 .matrix .out small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+/* Заголовок входа или выхода: «IN n», подпись второй строкой, теги под ней. */
+.io-num { display: block; font: 600 11px var(--mono); color: var(--muted); }
+.io-name {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+  font: 11px var(--sans); color: var(--text);
+}
+.matrix .out .io-name { font: 12px var(--sans); }
+.matrix .io-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 6px; margin-top: 2px; }
+.matrix .out .io-tags { justify-content: flex-start; }
 .cell {
   height: 42px;
   border-radius: 10px;
@@ -217,11 +235,48 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .warn { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--muted); }
 #macText { font-family: var(--mono); }
 
+/* ── Подписи и теги: меню правого клика и редактор ──────────────────────────────── */
+.io-menu {
+  position: fixed; z-index: 90; min-width: 160px; padding: 6px; border-radius: 14px;
+  background: linear-gradient(160deg, rgba(41, 46, 66, 0.9), rgba(27, 30, 46, 0.86));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  animation: modal-pop 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.io-menu[hidden] { display: none !important; }
+.io-menu-item {
+  width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--text); font: 13px var(--sans); text-align: left; cursor: pointer;
+}
+.io-menu-item:hover { background: rgba(122, 162, 247, 0.16); }
+.io-editor { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+.io-editor h3 { font-family: var(--mono); }
+.io-editor .field { gap: 6px; }
+.io-tags-edit { display: flex; flex-wrap: wrap; gap: 6px; }
+.io-tags-edit:empty { display: none; }
+.io-add { display: flex; gap: 8px; }
+.io-add input { flex: 1; min-width: 0; }
+.io-add .btn { flex: none; }
+.io-tag { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; white-space: nowrap; }
+.io-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; box-shadow: 0 0 6px rgba(255, 255, 255, 0.25); }
+.io-tag-full {
+  padding: 3px 4px 3px 9px; border-radius: 999px;
+  background: var(--panel-hi); border: 1px solid var(--border);
+  font: 12px var(--mono); color: var(--text);
+}
+.io-tag-mini { font: 10px var(--mono); color: var(--muted); }
+.io-tag-x {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 0 4px;
+}
+.io-tag-x:hover { color: var(--red); }
+
 /* ── Телефон: всё в один столбец, матрица остаётся 8 колонками ─────────────────── */
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "matrix" "edid" "net";
+    grid-template-areas: "matrix" "side";
   }
 }
 @media (max-width: 640px) {
@@ -231,6 +286,8 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
   .matrix { grid-template-columns: 52px repeat(8, minmax(0, 1fr)); gap: 4px; }
   .matrix .out { font-size: 12px; }
   .matrix .out small { display: none; }
+  /* В узкой колонке остаются только точки: полный текст тега — в панели подписей. */
+  .matrix .io-tag-mini .io-tag-text { display: none; }
   .cell { height: 36px; font-size: 13px; border-radius: 8px; }
   .all-row { gap: 4px; }
   .all-row button { height: 30px; font-size: 11px; }
@@ -357,6 +414,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 
 /* ── Переключатель языка: плашка справа от связи, выпадающий список в стиле стекла ── */
 .lang { position: relative; }
+.logout-form { margin: 0; }
 .lang-btn { gap: 8px; cursor: pointer; }
 .lang-btn:hover { border-color: var(--blue); color: var(--text); }
 .lang-flag { font-size: 15px; line-height: 1; }

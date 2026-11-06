@@ -90,5 +90,14 @@
   "scan.errTooLarge": "Bereich zu groß: höchstens /24 pro Suche",
   "scan.errBadRange": "Netz im Format 192.168.1.0/24 eingeben",
   "scan.errNotPrivate": "Nur private Netze (10.x, 192.168.x, 172.16–31.x) können durchsucht werden",
-  "err.port": "Port muss eine Zahl von 1 bis 65535 sein"
+  "err.port": "Port muss eine Zahl von 1 bis 65535 sein",
+  "io.tagPlaceholder": "Neuer Tag",
+  "io.tagAdd": "Hinzufügen",
+  "io.tagRemove": "Tag {tag} entfernen",
+  "io.limit": "Höchstens {max} Tags",
+  "io.edit": "Bearbeiten",
+  "io.label": "Bezeichnung",
+  "io.tags": "Tags",
+  "io.save": "Speichern",
+  "auth.logout": "Abmelden"
 }

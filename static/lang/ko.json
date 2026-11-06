@@ -90,5 +90,14 @@
   "scan.errTooLarge": "범위가 너무 큽니다: 검색당 최대 /24",
   "scan.errBadRange": "192.168.1.0/24 형식으로 입력하세요",
   "scan.errNotPrivate": "사설 네트워크(10.x, 192.168.x, 172.16–31.x)만 검색할 수 있습니다",
-  "err.port": "포트는 1~65535 사이의 숫자여야 합니다"
+  "err.port": "포트는 1~65535 사이의 숫자여야 합니다",
+  "io.tagPlaceholder": "새 태그",
+  "io.tagAdd": "추가",
+  "io.tagRemove": "태그 {tag} 삭제",
+  "io.limit": "태그는 최대 {max}개",
+  "io.edit": "편집",
+  "io.label": "라벨",
+  "io.tags": "태그",
+  "io.save": "저장",
+  "auth.logout": "로그아웃"
 }

@@ -90,5 +90,14 @@
   "scan.errTooLarge": "Plage trop grande : /24 maximum par analyse",
   "scan.errBadRange": "Indique un réseau comme 192.168.1.0/24",
   "scan.errNotPrivate": "Seuls les réseaux privés peuvent être analysés (10.x, 192.168.x, 172.16–31.x)",
-  "err.port": "le port doit être un nombre de 1 à 65535"
+  "err.port": "le port doit être un nombre de 1 à 65535",
+  "io.tagPlaceholder": "Nouveau tag",
+  "io.tagAdd": "Ajouter",
+  "io.tagRemove": "Retirer le tag {tag}",
+  "io.limit": "{max} tags maximum",
+  "io.edit": "Modifier",
+  "io.label": "Libellé",
+  "io.tags": "Tags",
+  "io.save": "Enregistrer",
+  "auth.logout": "Déconnexion"
 }

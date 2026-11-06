@@ -23,7 +23,7 @@ usage() {
 
   --port      порт на хосте (по умолчанию 8080)
   --bind      адрес публикации: 127.0.0.1 — только этот хост, 0.0.0.0 — вся локальная сеть
-  --user      логин basic auth (по умолчанию admin)
+  --user      логин для входа на страницу (по умолчанию admin)
   --password  пароль; если не задан, генерируется случайный и выводится один раз
 
 Параметры применяются только при создании .env. Чтобы пересоздать его, удали .env.
@@ -142,29 +142,37 @@ fi
 
 docker compose up -d --build
 
-# Контейнер поднимается не мгновенно, а пароль генерирует entrypoint при старте.
-# Проверяем реальный ответ с логином: так ловим и неподнявшийся контейнер, и неверный пароль.
+# Контейнер поднимается не мгновенно. Проверяем вход тем же путём, что и браузер: форму /login.
+# Успех — редирект на главную, неверный пароль — редирект на /login?error=1. Это ответ, а не таймаут,
+# поэтому неверные данные сообщаем сразу, без ожидания.
 wait_ready() {
-  local deadline=$((SECONDS + READY_TIMEOUT)) code="000"
+  local deadline=$((SECONDS + READY_TIMEOUT))
+  local base="http://127.0.0.1:${PORT}"
+  local result="000"
   while [ "$SECONDS" -lt "$deadline" ]; do
-    # Логин и пароль передаём через stdin (curl -K -), чтобы не светить их в списке процессов.
-    # Таймауты нужны: без них один зависший адрес держал бы скрипт дольше заявленных 30 секунд.
-    code=$(printf 'user = "%s:%s"\n' "$LOGIN_NAME" "$PASSWORD" |
-      curl -s -o /dev/null -w '%{http_code}' --connect-timeout 2 --max-time 3 -K - \
-        "http://127.0.0.1:${PORT}/" || true)
-    if [ "$code" = "200" ]; then
-      return 0
-    fi
+    # Логин и пароль передаём через stdin (-K -): в списке процессов их не видно.
+    # Таймауты нужны: без них один зависший адрес держал бы скрипт дольше заявленного срока.
+    result=$(printf 'url = "%s/login"\ndata-urlencode = "login=%s"\ndata-urlencode = "password=%s"\n' \
+        "$base" "$LOGIN_NAME" "$PASSWORD" |
+      curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --connect-timeout 2 --max-time 3 -X POST -K - || true)
+    case "$result" in
+      "303 ${base}/") return 0 ;;
+      "303 ${base}/login?error=1") LAST_CODE="$result"; return 2 ;;
+    esac
     sleep 1
   done
-  LAST_CODE="$code"
+  LAST_CODE="$result"
   return 1
 }
 
 LAST_CODE="000"
-if ! wait_ready; then
-  die "Контейнер не отвечает с логином за ${READY_TIMEOUT} секунд (последний HTTP-код: ${LAST_CODE}). 401 — неверный логин или пароль в .env; 000 — порт не отвечает. Логи: docker compose logs matrix-ui" 1
-fi
+status=0
+wait_ready || status=$?
+case "$status" in
+  0) ;;
+  2) die "Вход отклонён: логин или пароль в .env не совпадают с контейнером. Ответ: ${LAST_CODE}" 1 ;;
+  *) die "Контейнер не отвечает за ${READY_TIMEOUT} секунд (последний ответ: ${LAST_CODE}). 000 — порт не отвечает. Логи: docker compose logs matrix-ui" 1 ;;
+esac
 
 echo
 echo "Готово: http://127.0.0.1:${PORT}"

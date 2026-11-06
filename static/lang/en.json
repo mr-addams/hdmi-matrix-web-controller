@@ -90,5 +90,14 @@
   "scan.errTooLarge": "Range is too large: at most /24 per scan",
   "scan.errBadRange": "Enter a network like 192.168.1.0/24",
   "scan.errNotPrivate": "Only private networks can be scanned (10.x, 192.168.x, 172.16–31.x)",
-  "err.port": "port must be a number from 1 to 65535"
+  "err.port": "port must be a number from 1 to 65535",
+  "io.tagPlaceholder": "New tag",
+  "io.tagAdd": "Add",
+  "io.tagRemove": "Remove tag {tag}",
+  "io.limit": "Up to {max} tags",
+  "io.edit": "Edit",
+  "io.label": "Label",
+  "io.tags": "Tags",
+  "io.save": "Save",
+  "auth.logout": "Sign out"
 }
