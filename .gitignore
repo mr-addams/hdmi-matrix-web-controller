@@ -1,6 +1,5 @@
 node_modules/
 .env
-.htpasswd
 *.log
 .DS_Store
 Thumbs.db

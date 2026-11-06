@@ -25,7 +25,21 @@ node --check static/app.js
 node --check static/i18n.js
 node --check static/protocol.js
 for f in static/lang/*.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"; done
-docker run --rm -v "$PWD/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:stable-alpine nginx -t
+```
+
+Tests for the installer run without Docker or network: the tests replace `docker` and `curl` with stubs.
+
+```bash
+bash tests/install_test.sh
+shellcheck install.sh tests/install_test.sh
+```
+
+Tests for the server (Go 1.24 or newer):
+
+```bash
+gofmt -l .
+go vet ./...
+go test -race ./...
 ```
 
 ## Pull requests

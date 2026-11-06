@@ -18,6 +18,10 @@ import {
 import { applyStaticTexts, currentLanguage, initI18n, LANGUAGES, setLanguage, t } from "./i18n.js";
 
 const STORE_KEY = "hdmi-matrix.v1";
+// Настройки отображения на сервере: адрес обслуживает hdmi-ui, версия формата совпадает с config.go.
+const CONFIG_URL = "/api/config";
+const IO_CONFIG_VERSION = 1;
+const IO_CONFIG_TIMEOUT_MS = 3000;
 const POLL_MS = 3000;
 const REQUEST_TIMEOUT_MS = 6000;
 // Для проверки доступности таймаут короче: офлайн-матрица не должна держать опрос дольше секунды.
@@ -27,6 +31,15 @@ const OUTPUTS = [1, 2, 3, 4, 5, 6, 7, 8];
 const FLAG_KEYS = ["hdr", "threeD", "bit30", "bit36", "bit48"];
 // Копии TV: код EDID → номер экрана. Коды 5–9 и A–C, см. protocol.js.
 const EDID_COPY_SOURCE = { 5: 1, 6: 2, 7: 3, 8: 4, 9: 5, A: 6, B: 7, C: 8 };
+// Палитра точек у тегов. Цвет берётся из текста тега (tagColor), поэтому одинаковые теги всегда одного цвета.
+const IO_COLORS = [
+  "#7aa2f7", "#7dcfff", "#bb9af7", "#9ece6a", "#e0af68", "#ff9e64", "#f7768e", "#73daca",
+  "#2ac3de", "#b4f9f8", "#c3e88d", "#ffc777", "#ff007c", "#c099ff", "#89ddff", "#d7827e",
+];
+// Лимиты держат матрицу читаемой: длинная подпись уже не влезает в колонку 8×8.
+const IO_LABEL_MAX = 32;
+const IO_TAG_MAX = 16;
+const IO_MAX_TAGS = 6;
 
 const $ = (id) => document.getElementById(id);
 
@@ -86,8 +99,17 @@ function queueDevice(ip, task) {
   return run;
 }
 
+// Сессия истекла или её не было: страница уходит на вход, а не висит в состоянии «нет связи».
+function checkSession(response) {
+  if (response.status === 401) {
+    location.assign("login");
+    throw new Error("нужен вход");
+  }
+  return response;
+}
+
 function deviceRequest(ip, url, { method = "GET", body, headers, timeout = REQUEST_TIMEOUT_MS, queued = true } = {}) {
-  const run = () => fetch(url, { method, body, headers, cache: "no-store", signal: AbortSignal.timeout(timeout) });
+  const run = () => fetch(url, { method, body, headers, cache: "no-store", signal: AbortSignal.timeout(timeout) }).then(checkSession);
   return queued ? queueDevice(ip, run) : run();
 }
 
@@ -333,11 +355,214 @@ async function activate(mac) {
   // Сразу очищаем вид: иначе на экране остаются «зелёные» ячейки прошлой матрицы.
   setViewState("loading");
   showError("routeError", "");
+  renderIoLabels();
   renderMatrix();
   setWelcome(false);
   renderTabs();
   setLink(false, "link.connecting");
   await refresh();
+}
+
+// ── Подписи и теги входов и выходов ──────────────────────────────────────────────
+// Хранятся в записи матрицы (по MAC) вместе с адресом, поэтому переживают смену IP.
+// Пустая подпись значит «как по умолчанию»: в данных ничего не пишем.
+
+function ioEntry(device, kind, n, create = false) {
+  if (!device) return null;
+  device.io ??= { in: {}, out: {} };
+  const entries = device.io[kind];
+  if (!entries[n] && create) entries[n] = { label: "", tags: [] };
+  return entries[n] ?? null;
+}
+
+function ioDefaultName(kind, n) {
+  return t(kind === "in" ? "matrix.in" : "matrix.out", { n });
+}
+
+// Подпись там, где нужно короткое имя (строки EDID): без подписи остаётся «IN n».
+function ioName(kind, n) {
+  return ioEntry(activeDevice(), kind, n)?.label || ioDefaultName(kind, n);
+}
+
+// Цвет тега — функция от его текста: одинаковый тег всегда одного цвета, после перезагрузки тоже.
+// FNV-1a — простой хеш без зависимостей. Регистр и пробелы по краям не различаем: «HDR» и «hdr» — один тег.
+function tagColor(text) {
+  let hash = 0x811c9dc5;
+  for (const char of text.trim().toLowerCase()) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return IO_COLORS[hash % IO_COLORS.length];
+}
+
+// Один тег: точка цвета и текст. В матрице компактная версия, в редакторе — с кнопкой удаления.
+function tagChip(tag, variant) {
+  const chip = el("span", `io-tag io-tag-${variant}`);
+  const dot = el("i", "io-dot");
+  dot.style.background = tagColor(tag.text);
+  chip.append(dot, el("span", "io-tag-text", tag.text));
+  return chip;
+}
+
+// Заголовок или строка выхода: «IN n» всегда, подпись второй строкой, теги под ней.
+function fillIoCell(cell, kind, n) {
+  const entry = ioEntry(activeDevice(), kind, n);
+  const lines = [el("span", "io-num", ioDefaultName(kind, n))];
+  if (entry?.label) lines.push(el("span", "io-name", entry.label));
+  if (entry?.tags.length) {
+    const line = el("span", "io-tags");
+    for (const tag of entry.tags) line.append(tagChip(tag, "mini"));
+    lines.push(line);
+    cell.title = entry.tags.map((tag) => tag.text).join(", ");
+  } else {
+    cell.removeAttribute("title");
+  }
+  cell.replaceChildren(...lines);
+}
+
+// Подписи, которые видны вне матрицы: заголовки и строки матрицы, имена входов в EDID.
+function renderIoLabels() {
+  renderMatrixLabels();
+  $("ioMenuEdit").textContent = t("io.edit");
+  for (const row of document.querySelectorAll(".edid-row")) renderEdidRowLabels(row);
+}
+
+// ── Меню и редактор ──────────────────────────────────────────────────────────────
+// Правый клик по заголовку открывает меню, его пункт — редактор. Редактор работает с черновиком:
+// правки попадают в запись только после «Сохранить», Escape и «Отмена» их отбрасывают.
+
+let ioTarget = null; // заголовок, для которого открыто меню
+let ioDraft = null;  // черновик редактора: { kind, n, label, tags }
+
+function openIoMenu(event, kind, n) {
+  event.preventDefault();
+  if (!activeDevice()) return;
+  ioTarget = { kind, n };
+  const menu = $("ioMenu");
+  menu.hidden = false;
+  // Меню не должно уезжать за край окна: пункт у правого или нижнего края стал бы недоступен.
+  const left = Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8);
+  const top = Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8);
+  menu.style.left = `${Math.max(8, left)}px`;
+  menu.style.top = `${Math.max(8, top)}px`;
+}
+
+function closeIoMenu() {
+  $("ioMenu").hidden = true;
+  ioTarget = null;
+}
+
+function openIoEditor(kind, n) {
+  const device = activeDevice();
+  if (!device) return;
+  const entry = ioEntry(device, kind, n);
+  ioDraft = { kind, n, label: entry?.label ?? "", tags: (entry?.tags ?? []).map((tag) => ({ ...tag })) };
+  $("ioTitle").textContent = ioDefaultName(kind, n);
+  $("ioLabel").value = ioDraft.label;
+  $("ioLabel").placeholder = ioDefaultName(kind, n);
+  $("ioTagInput").value = "";
+  showError("ioError", "");
+  renderIoDraftTags();
+  $("ioModal").hidden = false;
+  $("ioLabel").focus();
+}
+
+function closeIoEditor() {
+  ioDraft = null;
+  $("ioModal").hidden = true;
+}
+
+function renderIoDraftTags() {
+  $("ioTags").replaceChildren(...ioDraft.tags.map((tag, index) => editableTag(index, tag)));
+  const full = ioDraft.tags.length >= IO_MAX_TAGS;
+  $("ioTagInput").disabled = full;
+  $("ioTagAdd").disabled = full;
+  $("ioTagInput").title = full ? t("io.limit", { max: IO_MAX_TAGS }) : "";
+}
+
+function editableTag(index, tag) {
+  const chip = tagChip(tag, "full");
+  const remove = el("button", "io-tag-x", "×");
+  remove.type = "button";
+  remove.setAttribute("aria-label", t("io.tagRemove", { tag: tag.text }));
+  remove.addEventListener("click", () => {
+    ioDraft.tags.splice(index, 1);
+    renderIoDraftTags();
+  });
+  chip.append(remove);
+  return chip;
+}
+
+function addDraftTag() {
+  const input = $("ioTagInput");
+  const text = input.value.trim();
+  if (!text || ioDraft.tags.length >= IO_MAX_TAGS) return;
+  ioDraft.tags.push({ text });
+  input.value = "";
+  renderIoDraftTags();
+  input.focus();
+}
+
+function saveIoDraft(event) {
+  event.preventDefault();
+  const device = activeDevice();
+  if (!device || !ioDraft) return;
+  const entry = ioEntry(device, ioDraft.kind, ioDraft.n, true);
+  entry.label = $("ioLabel").value.trim();
+  entry.tags = ioDraft.tags;
+  closeIoEditor();
+  commitIo();
+}
+
+// Подписи и теги живут на сервере контейнера, чтобы их видели все браузеры. localStorage остаётся
+// запасным вариантом: если сервер недоступен, работаем с тем, что уже есть в браузере.
+async function loadIoConfig() {
+  let remote;
+  try {
+    const response = checkSession(await fetch(CONFIG_URL, { cache: "no-store", signal: AbortSignal.timeout(IO_CONFIG_TIMEOUT_MS) }));
+    if (!response.ok) return;
+    remote = await response.json();
+  } catch {
+    return;
+  }
+  const remoteDevices = remote.devices ?? {};
+  if (Object.keys(remoteDevices).length > 0) {
+    for (const [mac, device] of Object.entries(store.devices)) {
+      if (remoteDevices[mac]?.io) device.io = remoteDevices[mac].io;
+    }
+    saveStore();
+  } else if (Object.values(store.devices).some((device) => device.io)) {
+    // Первый запуск новой версии: подписи, накопленные в этом браузере, переезжают на сервер.
+    pushIoConfig();
+  }
+}
+
+// Отправляем подписи всех матриц целиком: объём мал, а частичные обновления усложнили бы сервер.
+// Ошибку не показываем в интерфейсе: подписи остаются в localStorage и уйдут при следующем изменении.
+async function pushIoConfig() {
+  const devices = {};
+  for (const [mac, device] of Object.entries(store.devices)) {
+    if (device.io) devices[mac] = { io: device.io };
+  }
+  try {
+    const response = checkSession(await fetch(CONFIG_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: IO_CONFIG_VERSION, devices }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(IO_CONFIG_TIMEOUT_MS),
+    }));
+    if (!response.ok) console.warn(`подписи не сохранились на сервере: HTTP ${response.status}`);
+  } catch (error) {
+    console.warn(`подписи не сохранились на сервере: ${error.message}`);
+  }
+}
+
+// Любое изменение подписей: сохранить в браузере, на сервере и перерисовать то, что их показывает.
+function commitIo() {
+  saveStore();
+  renderIoLabels();
+  pushIoConfig();
 }
 
 // ── Матрица ──────────────────────────────────────────────────────────────────────
@@ -349,12 +574,15 @@ function buildMatrix() {
     const head = document.createElement("div");
     head.className = "head";
     head.dataset.n = input;
+    // Меню и редактор подписи открываются правым кликом по заголовку; сами элементы живут весь сеанс.
+    head.addEventListener("contextmenu", (event) => openIoMenu(event, "in", input));
     matrix.append(head);
   }
   for (const output of OUTPUTS) {
     const label = document.createElement("div");
     label.className = "out";
     label.dataset.n = output;
+    label.addEventListener("contextmenu", (event) => openIoMenu(event, "out", output));
     matrix.append(label);
     for (const input of INPUTS) {
       const cell = document.createElement("button");
@@ -381,8 +609,8 @@ function buildMatrix() {
 
 // Подписи матрицы: вызывается при построении и при смене языка.
 function renderMatrixLabels() {
-  for (const element of document.querySelectorAll(".head")) element.textContent = t("matrix.in", { n: element.dataset.n });
-  for (const element of document.querySelectorAll(".out")) element.textContent = t("matrix.out", { n: element.dataset.n });
+  for (const element of document.querySelectorAll(".head")) fillIoCell(element, "in", Number(element.dataset.n));
+  for (const element of document.querySelectorAll(".out")) fillIoCell(element, "out", Number(element.dataset.n));
   for (const cell of document.querySelectorAll(".cell")) {
     cell.setAttribute("aria-label", t("matrix.cell", { o: cell.dataset.output, i: cell.dataset.input }));
   }
@@ -553,7 +781,7 @@ function buildEdidRow(input) {
 
 // Подписи строки EDID: вызывается при построении и при смене языка.
 function renderEdidRowLabels(row) {
-  row.querySelector("[data-in-label]").textContent = t("matrix.in", { n: row.dataset.input });
+  row.querySelector("[data-in-label]").textContent = ioName("in", Number(row.dataset.input));
   for (const option of row.querySelectorAll("[data-code] option")) option.textContent = edidName(option.value);
   for (const option of row.querySelectorAll("[data-audio] option")) {
     option.textContent = t("edid.audio", { mode: option.value });
@@ -959,15 +1187,60 @@ function renderAllLabels() {
   renderLink();
   renderViewState();
   renderAddTitles();
-  renderMatrixLabels();
+  renderIoLabels();
   renderTabs();
-  for (const row of document.querySelectorAll(".edid-row")) renderEdidRowLabels(row);
   renderAll();
   tickClock();
 }
 
 function tickClock() {
   $("clock").textContent = new Date().toLocaleTimeString(currentLanguage().locale);
+}
+
+// Меню подписи закрываем кликом мимо, Escape, прокруткой и изменением окна: иначе оно повисает.
+// Редактор закрывается Escape и кликом по затемнению; Enter в поле тега добавляет тег, а не сохраняет.
+function bindIoEditor() {
+  $("ioMenuEdit").addEventListener("click", () => {
+    const target = ioTarget;
+    closeIoMenu();
+    if (target) openIoEditor(target.kind, target.n);
+  });
+  // pointerdown, а не click: после правого клика браузер может прислать click по заголовку,
+  // и меню закрылось бы сразу же после открытия. pointerdown приходит раньше contextmenu.
+  document.addEventListener("pointerdown", (event) => {
+    if (!$("ioMenu").contains(event.target)) closeIoMenu();
+  });
+  window.addEventListener("resize", closeIoMenu);
+  window.addEventListener("scroll", closeIoMenu, true);
+  $("ioForm").addEventListener("submit", saveIoDraft);
+  $("ioCancel").addEventListener("click", closeIoEditor);
+  $("ioModal").addEventListener("click", (event) => {
+    if (event.target === $("ioModal")) closeIoEditor();
+  });
+  $("ioTagAdd").addEventListener("click", addDraftTag);
+  $("ioTagInput").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    addDraftTag();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    closeIoMenu();
+    if (!$("ioModal").hidden) closeIoEditor();
+  });
+}
+
+// Панели EDID и «Сеть» закрыты по умолчанию. Состояние запоминаем отдельно для каждой,
+// на весь браузер: раскладка одна для всех матриц, а не привязана к конкретной.
+function bindCollapsiblePanels() {
+  for (const [id, key] of [["edidPanel", "edid"], ["netPanel", "net"]]) {
+    const panel = $(id);
+    panel.open = store.panels?.[key] === true;
+    panel.addEventListener("toggle", () => {
+      store.panels = { ...store.panels, [key]: panel.open };
+      saveStore();
+    });
+  }
 }
 
 function bindLanguageMenu() {
@@ -990,8 +1263,10 @@ async function init() {
   buildMatrix();
   buildLangMenu();
   bindLanguageMenu();
+  bindIoEditor();
+  bindCollapsiblePanels();
   renderLangButton();
-  renderMatrixLabels();
+  renderIoLabels();
 
   $("addForm").addEventListener("submit", addDevice);
   for (const button of document.querySelectorAll(".loader-action")) button.addEventListener("click", startEditAddress);
@@ -1008,6 +1283,10 @@ async function init() {
   // Опрос запущен всегда: матрицу могут добавить уже после загрузки страницы.
   setInterval(refresh, POLL_MS);
   setInterval(checkPresence, POLL_MS);
+
+  // Подписи подгружаем до первой активации: иначе матрица сначала покажет «IN 1» без подписей.
+  await loadIoConfig();
+  renderIoLabels();
 
   const devices = Object.keys(store.devices);
   if (!devices.length) {

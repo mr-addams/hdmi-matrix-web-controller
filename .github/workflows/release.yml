@@ -1,0 +1,111 @@
+# Релиз: тесты, мультиархитектурный образ в GHCR и GitHub Release. Запускается тегом вида v1.2.3
+# или вручную (тогда публикуются только теги ветки и коммита, без latest и без релиза).
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+# По умолчанию — только чтение. Записи выдаём отдельным job, которым она нужна.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Форматирование и vet
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+      - name: Тесты с детектором гонок
+        run: go test -race -count=1 ./...
+      - name: Compose-файл валиден
+        run: docker compose config --quiet
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Теги образа
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha
+      - name: Сборка amd64 для проверки запуском
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: hdmi-ui:smoke
+      - name: Проверка запуском
+        run: |
+          docker run -d --name smoke -p 127.0.0.1:18080:8080 -e UI_PASSWORD=smoke-pass hdmi-ui:smoke
+          for _ in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/login || true)
+            [ "$code" = "200" ] && break
+            sleep 1
+          done
+          test "$code" = "200"
+          # Без входа страница не открывается, с неверным паролем — тоже.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/)" = "303"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/api/config)" = "401"
+          docker logs smoke
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Сборка и публикация (amd64, arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  release:
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Создать GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Повторный запуск для уже опубликованного тега не должен падать: релиз уже есть.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "релиз ${GITHUB_REF_NAME} уже существует"
+          else
+            gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --generate-notes
+          fi

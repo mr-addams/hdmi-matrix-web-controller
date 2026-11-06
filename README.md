@@ -18,7 +18,7 @@ The matrix this was written for has a usable hardware front panel and a working 
 - online/offline status per matrix, with state preserved across reloads;
 - a language switcher (English, Ukrainian, German, French, Spanish, Italian, Portuguese, Japanese, Korean, Chinese, Russian).
 
-Nothing is sent to any external service. The page talks only to your matrices, through a small nginx proxy in a container.
+Nothing is sent to any external service. The page talks only to your matrices, through a single Go binary in a container.
 
 ## Quick start
 
@@ -27,11 +27,14 @@ Requirements: Docker with the Compose plugin, and a matrix reachable on your net
 ```bash
 git clone https://github.com/mr-addams/hdmi-matrix-web-controller.git
 cd hdmi-matrix-web-controller
-cp .env.example .env        # change UI_PASSWORD first
-docker compose up -d --build
+./install.sh
 ```
 
-Open `http://127.0.0.1:8080`, sign in with the basic-auth credentials from `.env`, and add a matrix by its IP address (`192.168.1.50`, or `192.168.1.50:8080` for a non-default port).
+The script creates `.env` with a random password (printed once), builds the image, starts the container, and waits until the page answers with the credentials. Options: `--port`, `--bind`, `--user`, `--password`; run `./install.sh --help`. An existing `.env` is kept as it is.
+
+Prefer to configure it by hand? Copy `.env.example` to `.env`, change `UI_PASSWORD`, then run `docker compose up -d --build`.
+
+Open `http://127.0.0.1:8080`, sign in with the login and password from `.env`, and add a matrix by its IP address (`192.168.1.50`, or `192.168.1.50:8080` for a non-default port).
 
 To make the page reachable from other machines on your LAN, set `MATRIX_UI_BIND=0.0.0.0` in `.env`. Read the security notes below before doing so.
 
@@ -39,8 +42,8 @@ To make the page reachable from other machines on your LAN, set `MATRIX_UI_BIND=
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `UI_USER` | `admin` | Login for the page (basic auth). |
-| `UI_PASSWORD` | `matrix` | Password for the page. **Change it.** |
+| `UI_USER` | `admin` | Login for the sign-in page. |
+| `UI_PASSWORD` | `admin` | Password for the page. **Change it.** |
 | `MATRIX_UI_PORT` | `8080` | Port the page is published on. |
 | `MATRIX_UI_BIND` | `127.0.0.1` | Address the port is published on. |
 
@@ -48,7 +51,7 @@ To make the page reachable from other machines on your LAN, set `MATRIX_UI_BIND=
 
 - The matrix itself has **no authentication** for its web API. Anyone who can reach it on the network can switch inputs. Keep matrices on a trusted network segment.
 - The proxy only forwards to private addresses (`10.x`, `192.168.x`, `172.16–31.x`) and to TCP ports 1–65535. Other destinations return 403/400.
-- The basic-auth password is set from environment variables at container start and is not stored in the image. The default `matrix` is weak: change it before exposing the page.
+- The sign-in password is set from environment variables at container start and is not stored in the image. The default `admin` is weak: change it before exposing the page. Sessions live in memory: a restart signs everyone out. Behind an HTTPS proxy set `COOKIE_SECURE=true`.
 - Report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
 
 ## How it works
@@ -56,7 +59,10 @@ To make the page reachable from other machines on your LAN, set `MATRIX_UI_BIND=
 - `static/` — the page: plain HTML, CSS and ES modules, no build step.
 - `static/protocol.js` — the matrix protocol as used by the device's own web UI. Pure functions, unit-testable in Node.
 - `static/lang/*.json` — interface translations; English is the default and fallback.
-- `nginx.conf` — serves the page and proxies `/device/<ip>[:<port>]/…` to the matrix.
+- `main.go`, `auth.go`, `proxy.go`, `config.go` — the server: sign-in page and session cookie, static files (embedded with `go:embed`), the matrix proxy with its private-network and port checks, and the settings API (`/api/config`). Settings are stored in `/data/config.json` in the `matrix-data` volume; writes are atomic.
+- The image is built on distroless `static-debian13`: no shell, no package manager, no nginx.
+
+Run the tests without Docker: `go test -race ./...`.
 
 Protocol notes are in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 

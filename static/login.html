@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark">
+<title>HDMI Matrix · Sign in</title>
+<style>
+  /* Палитра страницы управления: вход выглядит как её продолжение. */
+  :root {
+    --bg: #1a1b26; --panel: #1f2335; --panel-hi: #292e42; --border: #3b4261;
+    --text: #c0caf5; --muted: #7a84b3; --blue: #7aa2f7; --cyan: #7dcfff; --red: #f7768e;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+  body {
+    font: 14px/1.45 var(--sans); display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 16px; box-sizing: border-box;
+    background:
+      radial-gradient(900px 500px at 10% -10%, rgba(122, 162, 247, 0.12), transparent 60%),
+      radial-gradient(700px 400px at 110% 110%, rgba(187, 154, 247, 0.10), transparent 55%),
+      var(--bg);
+  }
+  .card {
+    width: 100%; max-width: 360px; box-sizing: border-box; padding: 26px 24px 22px;
+    border-radius: 18px; background: linear-gradient(180deg, var(--panel), #16161e);
+    border: 1px solid var(--border); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+  }
+  h1 { margin: 0; font-size: 18px; letter-spacing: .02em; }
+  .hint { margin: 4px 0 18px; color: var(--muted); font-size: 13px; }
+  .error { margin: 0 0 14px; color: var(--red); font-size: 13px; }
+  form { display: flex; flex-direction: column; gap: 12px; }
+  label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12px; }
+  input {
+    height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel-hi); color: var(--text); font: 14px var(--mono);
+  }
+  input:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+  button {
+    height: 40px; margin-top: 4px; border-radius: 10px; border: 1px solid var(--blue);
+    background: linear-gradient(180deg, #3d59a1, #2f4a8a); color: #fff;
+    font: 600 14px var(--sans); cursor: pointer;
+  }
+  button:hover { box-shadow: 0 0 14px rgba(122, 162, 247, 0.35); }
+  button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>HDMI Matrix</h1>
+  <p class="hint">Sign in to manage your matrices</p>
+  <p class="error" id="error" role="alert" hidden>Wrong login or password</p>
+  <form method="post" action="/login">
+    <label>Login
+      <input name="login" autocomplete="username" maxlength="32" required autofocus>
+    </label>
+    <label>Password
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">Sign in</button>
+  </form>
+</main>
+<script>
+  // Ошибку показываем только после неудачной попытки: сервер возвращает ?error=1.
+  if (new URLSearchParams(location.search).has("error")) document.getElementById("error").hidden = false;
+</script>
+</body>
+</html>

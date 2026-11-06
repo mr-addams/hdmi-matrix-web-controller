@@ -90,5 +90,14 @@
   "scan.errTooLarge": "範囲が大きすぎます：1 回の検索は最大 /24",
   "scan.errBadRange": "192.168.1.0/24 のような形式で入力してください",
   "scan.errNotPrivate": "スキャンできるのはプライベートネットワークのみです（10.x、192.168.x、172.16–31.x）",
-  "err.port": "ポートは 1〜65535 の数値である必要があります"
+  "err.port": "ポートは 1〜65535 の数値である必要があります",
+  "io.tagPlaceholder": "新しいタグ",
+  "io.tagAdd": "追加",
+  "io.tagRemove": "タグ {tag} を削除",
+  "io.limit": "タグは最大 {max} 個",
+  "io.edit": "編集",
+  "io.label": "ラベル",
+  "io.tags": "タグ",
+  "io.save": "保存",
+  "auth.logout": "ログアウト"
 }
