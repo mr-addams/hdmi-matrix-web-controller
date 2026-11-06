@@ -28,6 +28,13 @@ for f in static/lang/*.json; do node -e "JSON.parse(require('fs').readFileSync('
 docker run --rm -v "$PWD/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:stable-alpine nginx -t
 ```
 
+Tests for the installer run without Docker or network: the tests replace `docker` and `curl` with stubs.
+
+```bash
+bash tests/install_test.sh
+shellcheck install.sh tests/install_test.sh
+```
+
 ## Pull requests
 
 - Keep one logical change per pull request.

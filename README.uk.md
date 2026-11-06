@@ -27,9 +27,12 @@ English version: [README.md](README.md) · Сайт проєкту: https://mr-a
 ```bash
 git clone https://github.com/mr-addams/hdmi-matrix-web-controller.git
 cd hdmi-matrix-web-controller
-cp .env.example .env        # спочатку змініть UI_PASSWORD
-docker compose up -d --build
+./install.sh
 ```
+
+Скрипт створює `.env` із випадковим паролем (показується один раз), збирає образ, запускає контейнер і чекає, поки сторінка відповість із логіном. Параметри: `--port`, `--bind`, `--user`, `--password`; довідка — `./install.sh --help`. Наявний `.env` залишається без змін.
+
+Хочете налаштувати вручну? Скопіюйте `.env.example` у `.env`, змініть `UI_PASSWORD` і виконайте `docker compose up -d --build`.
 
 Відкрийте `http://127.0.0.1:8080`, увійдіть з логіном і паролем із `.env` і додайте матрицю за IP-адресою (`192.168.1.50` або `192.168.1.50:8080`, якщо порт не стандартний).
 

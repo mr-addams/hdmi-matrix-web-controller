@@ -27,9 +27,12 @@ Requirements: Docker with the Compose plugin, and a matrix reachable on your net
 ```bash
 git clone https://github.com/mr-addams/hdmi-matrix-web-controller.git
 cd hdmi-matrix-web-controller
-cp .env.example .env        # change UI_PASSWORD first
-docker compose up -d --build
+./install.sh
 ```
+
+The script creates `.env` with a random password (printed once), builds the image, starts the container, and waits until the page answers with the credentials. Options: `--port`, `--bind`, `--user`, `--password`; run `./install.sh --help`. An existing `.env` is kept as it is.
+
+Prefer to configure it by hand? Copy `.env.example` to `.env`, change `UI_PASSWORD`, then run `docker compose up -d --build`.
 
 Open `http://127.0.0.1:8080`, sign in with the basic-auth credentials from `.env`, and add a matrix by its IP address (`192.168.1.50`, or `192.168.1.50:8080` for a non-default port).
 
