@@ -25,14 +25,15 @@ Nothing is sent to any external service. The page talks only to your matrices, t
 Requirements: Docker with the Compose plugin, and a matrix reachable on your network.
 
 ```bash
-git clone https://github.com/mr-addams/hdmi-matrix-web-controller.git
-cd hdmi-matrix-web-controller
-./install.sh
+curl -fsSLO https://raw.githubusercontent.com/mr-addams/hdmi-matrix-web-controller/main/install.sh
+bash install.sh
 ```
 
-The script creates `.env` with a random password (printed once), builds the image, starts the container, and waits until the page answers with the credentials. Options: `--port`, `--bind`, `--user`, `--password`; run `./install.sh --help`. An existing `.env` is kept as it is.
+The script downloads `compose.yaml` into `./hdmi-matrix`, creates `.env` with a random password (printed once) and the latest release version, pulls the published image from `ghcr.io` and starts the container. It waits until the sign-in works, then prints the address. Options: `--dir`, `--version`, `--port`, `--bind`, `--user`, `--password`; run `bash install.sh --help`.
 
-Prefer to configure it by hand? Copy `.env.example` to `.env`, change `UI_PASSWORD`, then run `docker compose up -d --build`.
+Re-running the script keeps your `.env`. To move to another release run `bash install.sh --version 0.2.0` in the same folder, or `docker compose pull && docker compose up -d` after changing `HDMI_UI_VERSION` in `.env` yourself.
+
+Prefer to set it up by hand? Copy `compose.yaml` and `.env.example` to a folder as `.env`, change `UI_PASSWORD`, then run `docker compose pull && docker compose up -d`. To build from source, use `docker compose -f compose.dev.yaml up -d --build`.
 
 Open `http://127.0.0.1:8080`, sign in with the login and password from `.env`, and add a matrix by its IP address (`192.168.1.50`, or `192.168.1.50:8080` for a non-default port).
 

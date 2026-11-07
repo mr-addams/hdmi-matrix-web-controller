@@ -15,7 +15,7 @@ Scope: hdmi-matrix-web-controller is a standalone micro-service for HDMI matrix 
 ```bash
 cd hdmi-matrix-web-controller
 cp .env.example .env
-docker compose up -d --build     # http://127.0.0.1:8080
+docker compose -f compose.dev.yaml up -d --build     # http://127.0.0.1:8080
 ```
 
 Syntax checks you can run locally:
