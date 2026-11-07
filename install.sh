@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# Установка страницы управления в Docker: создаёт .env, собирает образ и поднимает контейнер.
-# Скрипт сам переходит в свой каталог, где лежат compose.yaml и .env, поэтому запускать
-# его можно откуда угодно. Повторный запуск безопасен: существующий .env не перезаписываем,
-# иначе сменился бы пароль и текущие пользователи страницы перестали бы входить.
+# Установка страницы управления: скачивает compose.yaml, создаёт .env, берёт опубликованный образ
+# нужной версии и запускает контейнер. Повторный запуск безопасен: существующий .env не пересоздаём,
+# иначе сменился бы пароль и текущие пользователи перестали бы входить.
 set -euo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")"
+REPO_RAW="https://raw.githubusercontent.com/mr-addams/hdmi-matrix-web-controller/main"
+API_LATEST="https://api.github.com/repos/mr-addams/hdmi-matrix-web-controller/releases/latest"
 
 # Сколько ждём ответа контейнера с логином. Переменная нужна тестам, чтобы не ждать 30 секунд.
 READY_TIMEOUT="${READY_TIMEOUT:-30}"
 
+DIR="hdmi-matrix"
+VERSION=""
+VERSION_GIVEN=0
 PORT=8080
 BIND=127.0.0.1
 LOGIN_NAME="admin"
@@ -18,16 +21,19 @@ ARGS_GIVEN=0
 GENERATED=0
 
 usage() {
-  cat <<'EOF'
-Использование: ./install.sh [--port N] [--bind ADDR] [--user NAME] [--password PW]
+  cat <<'EOT'
+Использование: ./install.sh [--dir DIR] [--version X.Y.Z] [--port N] [--bind ADDR] [--user NAME] [--password PW]
 
+  --dir       папка установки (по умолчанию ./hdmi-matrix)
+  --version   версия образа, например 0.1.0; по умолчанию — последний релиз
   --port      порт на хосте (по умолчанию 8080)
   --bind      адрес публикации: 127.0.0.1 — только этот хост, 0.0.0.0 — вся локальная сеть
   --user      логин для входа на страницу (по умолчанию admin)
   --password  пароль; если не задан, генерируется случайный и выводится один раз
 
-Параметры применяются только при создании .env. Чтобы пересоздать его, удали .env.
-EOF
+Параметры --port, --bind, --user и --password применяются только при создании .env.
+--version работает и для уже установленной папки: версия в .env обновится.
+EOT
 }
 
 die() {
@@ -56,6 +62,10 @@ valid_login() {
   [[ "$1" =~ ^[A-Za-z0-9._-]{1,32}$ ]]
 }
 
+valid_version() {
+  [[ "$1" =~ ^(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]]
+}
+
 # Пароль попадает в .env без кавычек и в curl-конфиг в кавычках. Пробелы, #, кавычки,
 # $ и обратный слэш сломали бы один из этих разборов, управляющие символы — оба.
 valid_password() {
@@ -81,6 +91,40 @@ check_env_file() {
   valid_password "$PASSWORD" || die "В .env некорректный UI_PASSWORD (пустой или с запрещёнными символами)"
   valid_port "$PORT" || die "В .env некорректный MATRIX_UI_PORT: $PORT"
   valid_ipv4 "$BIND" || die "В .env некорректный MATRIX_UI_BIND: $BIND"
+  if grep -q '^HDMI_UI_VERSION=' .env; then
+    valid_version "$(read_env_value HDMI_UI_VERSION)" || die "В .env некорректный HDMI_UI_VERSION: $(read_env_value HDMI_UI_VERSION)"
+  fi
+}
+
+read_env_value() {
+  sed -n "s/^$1=//p" .env
+}
+
+# Меняет значение ключа в .env или дописывает ключ. Файл остаётся с правами 600: в нём пароль.
+set_env_value() {
+  local key="$1" value="$2" tmp
+  tmp=$(mktemp)
+  if grep -q "^${key}=" .env; then
+    sed "s|^${key}=.*|${key}=${value}|" .env > "$tmp"
+  else
+    cat .env > "$tmp"
+    echo "${key}=${value}" >> "$tmp"
+  fi
+  mv "$tmp" .env
+}
+
+# Версия образа: явная из --version или последний релиз с GitHub.
+resolve_version() {
+  if [ "$VERSION_GIVEN" -eq 1 ]; then
+    printf '%s' "$VERSION"
+    return 0
+  fi
+  local tag
+  tag=$(curl -fsSL --max-time 10 "$API_LATEST" 2>/dev/null | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1) || true
+  tag="${tag#v}"
+  [ -n "$tag" ] || die "Не удалось узнать последний релиз с GitHub. Укажи версию: --version X.Y.Z" 1
+  valid_version "$tag" || die "Неожиданный тег релиза: $tag. Укажи версию явно: --version X.Y.Z" 1
+  printf '%s' "$tag"
 }
 
 # ── Разбор аргументов ──
@@ -91,6 +135,8 @@ need_value() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --dir)      need_value "$@"; DIR="$2"; shift 2 ;;
+    --version)  need_value "$@"; VERSION="${2#v}"; VERSION_GIVEN=1; shift 2 ;;
     --port)     need_value "$@"; PORT="$2"; ARGS_GIVEN=1; shift 2 ;;
     --bind)     need_value "$@"; BIND="$2"; ARGS_GIVEN=1; shift 2 ;;
     --user)     need_value "$@"; LOGIN_NAME="$2"; ARGS_GIVEN=1; shift 2 ;;
@@ -100,20 +146,38 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$VERSION_GIVEN" -eq 1 ]; then
+  valid_version "$VERSION" || die "Версия должна быть вида X.Y.Z или latest: $VERSION"
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   die "Docker не найден. Установи Docker Engine с плагином Compose." 1
 fi
 if ! docker compose version >/dev/null 2>&1; then
   die "Нет плагина docker compose. Установи docker-compose-plugin." 1
 fi
-[ -f compose.yaml ] || die "compose.yaml не найден рядом со скриптом." 1
+
+mkdir -p "$DIR"
+cd "$DIR"
+
+if [ ! -f compose.yaml ]; then
+  echo "Скачиваю compose.yaml…"
+  # Качаем во временный файл: оборванная загрузка не должна оставить compose.yaml на полдороге.
+  curl -fsSL --max-time 30 -o compose.yaml.part "$REPO_RAW/compose.yaml" \
+    || die "Не удалось скачать compose.yaml с GitHub" 1
+  grep -q '^services:' compose.yaml.part || die "Скачанный compose.yaml не похож на compose-файл" 1
+  mv compose.yaml.part compose.yaml
+fi
 
 if [ -f .env ]; then
   if [ "$ARGS_GIVEN" -eq 1 ]; then
-    echo "Параметры командной строки проигнорированы: .env уже есть."
+    echo "Параметры --port, --bind, --user и --password проигнорированы: .env уже есть."
   fi
   check_env_file
-  echo ".env уже есть — используем его без изменений."
+  if [ "$VERSION_GIVEN" -eq 1 ] || ! grep -q '^HDMI_UI_VERSION=' .env; then
+    set_env_value HDMI_UI_VERSION "$(resolve_version)"
+  fi
+  echo ".env уже есть — настройки сохранены."
 else
   valid_login "$LOGIN_NAME" || die "Логин: только латиница, цифры, точка, подчёркивание и дефис, до 32 знаков: $LOGIN_NAME"
   valid_port "$PORT" || die "Порт должен быть числом 1–65535: $PORT"
@@ -126,21 +190,27 @@ else
   else
     valid_password "$PASSWORD" || die "Пароль не должен содержать пробелы, #, \$, кавычки, обратный слэш и управляющие символы."
   fi
+  VERSION_RESOLVED=$(resolve_version)
 
   # umask до записи: в .env лежит пароль, файл не должен быть читаем другим пользователям.
   (
     umask 077
-    cat > .env <<EOF
+    cat > .env <<EOT
 UI_USER=$LOGIN_NAME
 UI_PASSWORD=$PASSWORD
 MATRIX_UI_PORT=$PORT
 MATRIX_UI_BIND=$BIND
-EOF
+HDMI_UI_VERSION=$VERSION_RESOLVED
+EOT
   )
   echo ".env создан."
 fi
 
-docker compose up -d --build
+IMAGE_VERSION=$(read_env_value HDMI_UI_VERSION)
+IMAGE_VERSION="${IMAGE_VERSION:-latest}"
+echo "Скачиваю образ ghcr.io/mr-addams/hdmi-matrix-web-controller:${IMAGE_VERSION}…"
+docker compose pull || die "Не удалось скачать образ версии ${IMAGE_VERSION}. Проверь версию и доступ к ghcr.io" 1
+docker compose up -d || die "Не удалось запустить контейнер. Логи: docker compose logs" 1
 
 # Контейнер поднимается не мгновенно. Проверяем вход тем же путём, что и браузер: форму /login.
 # Успех — редирект на главную, неверный пароль — редирект на /login?error=1. Это ответ, а не таймаут,
@@ -177,9 +247,11 @@ esac
 echo
 echo "Готово: http://127.0.0.1:${PORT}"
 echo "Логин: ${LOGIN_NAME}"
+echo "Версия образа: ${IMAGE_VERSION}"
 if [ "$GENERATED" -eq 1 ]; then
   echo "Пароль (сгенерирован, сохранён в .env): ${PASSWORD}"
 fi
 if [ "$BIND" = "0.0.0.0" ]; then
   echo "Внимание: страница доступна всей локальной сети. Матрицы без аутентификации — см. SECURITY.md."
 fi
+echo "Обновить: ./install.sh --version X.Y.Z (в этой папке) или docker compose pull && docker compose up -d"

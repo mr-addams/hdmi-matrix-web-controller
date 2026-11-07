@@ -25,14 +25,15 @@ English version: [README.md](README.md) · Сайт проєкту: https://mr-a
 Потрібні: Docker з плагіном Compose і матриця, доступна у вашій мережі.
 
 ```bash
-git clone https://github.com/mr-addams/hdmi-matrix-web-controller.git
-cd hdmi-matrix-web-controller
-./install.sh
+curl -fsSLO https://raw.githubusercontent.com/mr-addams/hdmi-matrix-web-controller/main/install.sh
+bash install.sh
 ```
 
-Скрипт створює `.env` із випадковим паролем (показується один раз), збирає образ, запускає контейнер і чекає, поки сторінка відповість із логіном. Параметри: `--port`, `--bind`, `--user`, `--password`; довідка — `./install.sh --help`. Наявний `.env` залишається без змін.
+Скрипт завантажує `compose.yaml` у `./hdmi-matrix`, створює `.env` із випадковим паролем (показується один раз) і версією останнього релізу, забирає опублікований образ з `ghcr.io` і запускає контейнер. Він чекає, поки вхід запрацює, і виводить адресу. Параметри: `--dir`, `--version`, `--port`, `--bind`, `--user`, `--password`; довідка — `bash install.sh --help`.
 
-Хочете налаштувати вручну? Скопіюйте `.env.example` у `.env`, змініть `UI_PASSWORD` і виконайте `docker compose up -d --build`.
+Повторний запуск залишає ваш `.env`. Щоб перейти на іншу версію, виконайте `bash install.sh --version 0.2.0` у тій самій папці або змініть `HDMI_UI_VERSION` у `.env` і виконайте `docker compose pull && docker compose up -d`.
+
+Хочете налаштувати вручну? Скопіюйте `compose.yaml` і `.env.example` (як `.env`) у папку, змініть `UI_PASSWORD` і виконайте `docker compose pull && docker compose up -d`. Щоб зібрати з вихідного коду, використовуйте `docker compose -f compose.dev.yaml up -d --build`.
 
 Відкрийте `http://127.0.0.1:8080`, увійдіть з логіном і паролем із `.env` і додайте матрицю за IP-адресою (`192.168.1.50` або `192.168.1.50:8080`, якщо порт не стандартний).
 

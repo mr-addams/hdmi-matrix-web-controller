@@ -189,10 +189,8 @@
   <div class="wrap">
     <h2><span class="en">Quick start</span><span class="uk">Швидкий старт</span></h2>
     <p class="muted"><span class="en">You need Docker with the Compose plugin and a matrix reachable on your network.</span><span class="uk">Потрібні Docker з плагіном Compose і матриця, доступна у вашій мережі.</span></p>
-<pre><code>git clone https://github.com/mr-addams/hdmi-matrix-web-controller.git
-cd hdmi-matrix-web-controller
-cp .env.example .env        # change UI_PASSWORD first
-docker compose up -d --build</code></pre>
+<pre><code>curl -fsSLO https://raw.githubusercontent.com/mr-addams/hdmi-matrix-web-controller/main/install.sh
+bash install.sh             # downloads compose.yaml, writes .env, pulls the image, starts it</code></pre>
     <p><span class="en">Open <code>http://127.0.0.1:8080</code>, sign in, and add a matrix by its IP address.</span><span class="uk">Відкрийте <code>http://127.0.0.1:8080</code>, увійдіть і додайте матрицю за IP-адресою.</span></p>
     <p class="note">
       <span class="en"><strong>Security:</strong> matrices have no authentication for their web API. Keep them on a trusted network, change the default page password, and read the security notes in the README before publishing the page on your LAN.</span><span class="uk"><strong>Безпека:</strong> матриці не мають автентифікації для веб-API. Тримайте їх у довіреній мережі, змініть типовий пароль сторінки й прочитайте розділ безпеки в README, перш ніж публікувати сторінку в локальній мережі.</span>

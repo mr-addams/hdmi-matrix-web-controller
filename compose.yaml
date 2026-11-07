@@ -1,10 +1,8 @@
-# Страница управления HDMI-матрицами: один контейнер, без установки чего-либо ещё на хост.
-#
-# Запуск:  cp .env.example .env   # поменяй UI_PASSWORD
-#          docker compose up -d --build
+# Страница управления HDMI-матрицами: один контейнер из опубликованного образа.
+# Версию образа задаёт HDMI_UI_VERSION в .env; обычно её выставляет install.sh.
 services:
   matrix-ui:
-    build: .
+    image: ghcr.io/mr-addams/hdmi-matrix-web-controller:${HDMI_UI_VERSION:-latest}
     ports:
       # По умолчанию только loopback: у матриц нет аутентификации.
       - "${MATRIX_UI_BIND:-127.0.0.1}:${MATRIX_UI_PORT:-8080}:8080"
@@ -12,7 +10,7 @@ services:
       UI_USER: ${UI_USER:-admin}
       UI_PASSWORD: ${UI_PASSWORD:-admin}
     volumes:
-      # Подписи и теги входов и выходов. Named volume: переживает пересборку образа.
+      # Подписи и теги входов и выходов. Named volume: переживает обновление образа.
       - matrix-data:/data
     restart: unless-stopped
     # Ограничиваем контейнер: никаких дополнительных привилегий, корень read-only, запись только в /data.

@@ -32,11 +32,23 @@ make_case() {
   cat > "$CASE_DIR/bin/docker" <<'EOF'
 #!/usr/bin/env bash
 echo "docker $*" >> "$STUB_LOG"
+if [ "$*" = "compose pull" ] && [ -n "${FAKE_PULL_EXIT:-}" ]; then exit "$FAKE_PULL_EXIT"; fi
 exit "${FAKE_DOCKER_EXIT:-0}"
 EOF
   cat > "$CASE_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 echo "curl $*" >> "$STUB_LOG"
+# Скачивание compose.yaml и запрос последнего релиза: отдаём заранее подготовленные ответы.
+out=""; prev=""; url=""
+for arg in "$@"; do
+  if [ "$prev" = "-o" ]; then out="$arg"; fi
+  case "$arg" in http*) url="$arg" ;; esac
+  prev="$arg"
+done
+case "$url" in
+  *api.github.com*) printf '{"tag_name": "v0.2.0"}'; exit 0 ;;
+  *raw.githubusercontent*) printf 'services:\n  matrix-ui:\n    image: stub\n' > "$out"; exit 0 ;;
+esac
 config=$(cat)
 echo "curl-config: $config" >> "$STUB_LOG"
 # Вход в установщике проверяет редирект: по умолчанию имитируем успешный вход на главную.
@@ -50,12 +62,12 @@ EOF
   export STUB_LOG
   export PATH="$CASE_DIR/bin:$PATH"
   export READY_TIMEOUT=2
-  unset FAKE_HTTP_CODE FAKE_DOCKER_EXIT
+  unset FAKE_HTTP_CODE FAKE_DOCKER_EXIT FAKE_PULL_EXIT
 }
 
 # Запускает install.sh из копии случая; результат в OUT и RC.
 run_install() {
-  OUT=$(cd "$CASE_DIR" && bash ./install.sh "$@" 2>&1)
+  OUT=$(cd "$CASE_DIR" && bash ./install.sh --dir . "$@" 2>&1)
   RC=$?
 }
 
@@ -110,13 +122,15 @@ expect_output "Использование" "--help печатает справк
 # ── Новая установка ──
 
 make_case
-run_install --port 18080 --bind 0.0.0.0 --user ops --password s3cret
+run_install --port 18080 --bind 0.0.0.0 --user ops --password s3cret --version 0.3.0
 expect_rc 0 "установка с заданными параметрами проходит"
-expect_log "docker compose up -d --build" "compose поднимается с пересборкой"
+expect_log "docker compose pull" "образ скачивается с реестра"
+expect_log "docker compose up -d" "контейнер запускается"
+expect_no_log "--build" "образ не собирается при установке"
 expect_output "Готово: http://127.0.0.1:18080" "печатается адрес"
 expect_output "Внимание: страница доступна всей локальной сети" "при 0.0.0.0 есть предупреждение"
 expect_no_output "Пароль (сгенерирован" "заданный пароль не печатается"
-if [ "$(cat "$CASE_DIR/.env")" = "$(printf 'UI_USER=ops\nUI_PASSWORD=s3cret\nMATRIX_UI_PORT=18080\nMATRIX_UI_BIND=0.0.0.0')" ]; then
+if [ "$(cat "$CASE_DIR/.env")" = "$(printf 'UI_USER=ops\nUI_PASSWORD=s3cret\nMATRIX_UI_PORT=18080\nMATRIX_UI_BIND=0.0.0.0\nHDMI_UI_VERSION=0.3.0')" ]; then
   pass ".env содержит заданные значения"
 else
   fail ".env содержит не то: $(cat "$CASE_DIR/.env")"
@@ -158,7 +172,7 @@ if [ "$RC" -ne 0 ]; then pass "падение compose останавливает
 # ── Существующий .env ──
 
 make_case
-printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\n' > "$CASE_DIR/.env"
+printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\nHDMI_UI_VERSION=0.1.0\n' > "$CASE_DIR/.env"
 cp "$CASE_DIR/.env" "$CASE_DIR/env.before"
 run_install
 expect_rc 0 "существующий корректный .env принимается"
@@ -185,6 +199,36 @@ make_case
 printf 'UI_USER=admin\nUI_PASSWORD=\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\n' > "$CASE_DIR/.env"
 run_install
 expect_rc 2 "пустой пароль в .env отклоняется"
+
+# ── Скачивание и версии ──
+
+make_case
+rm -f "$CASE_DIR/compose.yaml"
+run_install --password s3cret
+expect_rc 0 "без compose.yaml установщик скачивает его"
+expect_log "raw.githubusercontent.com" "compose.yaml берётся с GitHub"
+expect_output "Версия образа: 0.2.0" "без --version берётся последний релиз"
+if grep -q '^HDMI_UI_VERSION=0.2.0$' "$CASE_DIR/.env"; then pass "версия последнего релиза записана в .env"; else fail "версия не записана в .env"; fi
+
+make_case
+run_install --password s3cret --version v0.1.0
+expect_rc 0 "--version принимает префикс v"
+if grep -q '^HDMI_UI_VERSION=0.1.0$' "$CASE_DIR/.env"; then pass "версия из --version записана без v"; else fail "версия из --version записана неверно"; fi
+
+make_case
+run_install --password s3cret --version 1.2
+expect_rc 2 "неполная версия отклоняется"
+
+make_case
+printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\nHDMI_UI_VERSION=0.1.0\n' > "$CASE_DIR/.env"
+run_install --version 0.4.0
+expect_rc 0 "--version обновляет уже установленную папку"
+if grep -q '^HDMI_UI_VERSION=0.4.0$' "$CASE_DIR/.env" && grep -q '^UI_PASSWORD=keepme$' "$CASE_DIR/.env"; then pass "версия обновлена, пароль сохранён"; else fail "обновление версии испортило .env"; fi
+
+make_case
+FAKE_PULL_EXIT=1 run_install --password s3cret
+expect_rc 1 "не скачался образ — установка останавливается"
+expect_output "Не удалось скачать образ" "ошибка скачивания образа названа"
 
 echo
 echo "Пройдено: $PASSED, провалено: $FAILED"
