@@ -18,16 +18,16 @@ import (
 const (
 	sessionCookie = "hdmi_session"
 	sessionTTL    = 12 * time.Hour
-	// Неудачный вход ждёт полсекунды. Это не защита от перебора, а способ сделать его медленным.
+	// A failed sign-in waits half a second. This does not stop brute force; it only slows it down.
 	failedLoginDelay = 500 * time.Millisecond
 )
 
-// loginPattern — правила логина те же, что в install.sh: логин попадает в .env, поэтому
-// двоеточие, пробелы и управляющие символы запрещены.
+// loginPattern uses the same login rules as install.sh: the login ends up in .env, so
+// colons, spaces and control characters are not allowed.
 var loginPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,32}$`)
 
-// validateCredentials проверяет логин и пароль при старте: лучше упасть сразу, чем принять
-// пустой пароль.
+// validateCredentials checks the login and password at startup: it is better to fail at once than to accept
+// an empty password.
 func validateCredentials(login, password string) error {
 	if !loginPattern.MatchString(login) {
 		return errors.New("UI_USER: только латиница, цифры, точка, подчёркивание и дефис, до 32 знаков")
@@ -41,8 +41,8 @@ func validateCredentials(login, password string) error {
 	return nil
 }
 
-// credentials хранит хеши логина и пароля. Сравниваем хеши фиксированной длины: так время
-// ответа не выдаёт длину настоящего пароля. Оба сравнения выполняются всегда.
+// credentials keeps hashes of the login and password. Comparing fixed-length hashes keeps the response time
+// from revealing the real password length. Both comparisons always run.
 type credentials struct {
 	login    [sha256.Size]byte
 	password [sha256.Size]byte
@@ -60,8 +60,8 @@ func (c credentials) match(login, password string) bool {
 	return loginMatch&passwordMatch == 1
 }
 
-// sessionStore держит выданные входы в памяти. После перезапуска сервиса все входы теряются,
-// и это осознанно: на локальной установке повторный вход — небольшая цена за отсутствие базы.
+// sessionStore keeps issued sessions in memory. A service restart drops all sessions,
+// which is intentional: on a local install signing in again is a small price for having no database.
 type sessionStore struct {
 	mu       sync.Mutex
 	ttl      time.Duration
@@ -73,7 +73,7 @@ func newSessionStore(ttl time.Duration) *sessionStore {
 	return &sessionStore{ttl: ttl, now: time.Now, expiries: map[string]time.Time{}}
 }
 
-// issue создаёт токен из 32 случайных байт: угадать его нельзя. Заодно убирает истёкшие.
+// issue creates a token from 32 random bytes, so it cannot be guessed. It also removes expired sessions.
 func (s *sessionStore) issue() (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -113,7 +113,7 @@ func (s *sessionStore) revoke(token string) {
 	delete(s.expiries, token)
 }
 
-// authenticator связывает вход, выход и проверку сессии.
+// authenticator ties together sign-in, sign-out and session checks.
 type authenticator struct {
 	creds        credentials
 	sessions     *sessionStore
@@ -133,7 +133,7 @@ func (a *authenticator) signedIn(r *http.Request) bool {
 	return err == nil && a.sessions.valid(cookie.Value)
 }
 
-// loginPage отдаёт страницу входа. Уже вошедшего отправляем на главную.
+// loginPage serves the sign-in page. A user who is already signed in goes to the main page.
 func (a *authenticator) loginPage(w http.ResponseWriter, r *http.Request) {
 	if a.signedIn(r) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -149,9 +149,9 @@ func (a *authenticator) loginPage(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(page)
 }
 
-// loginSubmit проверяет логин и пароль из формы и выдаёт cookie сессии.
+// loginSubmit checks the login and password from the form and issues the session cookie.
 func (a *authenticator) loginSubmit(w http.ResponseWriter, r *http.Request) {
-	// Форма входа короткая: лимит не даёт неаутентифицированному запросу прислать большое тело.
+	// The sign-in form is short: the limit stops an unauthenticated request from sending a large body.
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "некорректная форма", http.StatusBadRequest)
@@ -180,9 +180,9 @@ func (a *authenticator) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-// cookie: HttpOnly — скрипт страницы его не читает; SameSite=Strict — чужой сайт не может
-// отправить запрос с нашей сессией. Secure включается, когда сервис стоит за HTTPS-прокси:
-// по голому HTTP браузер такой cookie не сохранит.
+// cookie: HttpOnly keeps page scripts from reading it; SameSite=Strict stops other sites from
+// sending requests with our session. Secure is enabled when the service sits behind an HTTPS proxy:
+// over plain HTTP, browsers do not store such a cookie.
 func (a *authenticator) cookie(value string, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     sessionCookie,
@@ -195,8 +195,8 @@ func (a *authenticator) cookie(value string, maxAge int) *http.Cookie {
 	}
 }
 
-// require пускает дальше только с сессией. Страницы уходят на вход, а API и прокси отвечают 401:
-// скрипту страницы нужен код ошибки, а не HTML входа вместо JSON.
+// require lets a request through only with a session. Pages redirect to sign-in; the API and the proxy answer 401,
+// because page scripts need an error code, not sign-in HTML instead of JSON.
 func (a *authenticator) require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a.signedIn(r) {
@@ -211,7 +211,7 @@ func (a *authenticator) require(next http.Handler) http.Handler {
 	})
 }
 
-// securityHeaders ставит заголовки на все ответы, включая отказы входа.
+// securityHeaders sets headers on every response, including sign-in failures.
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")

@@ -17,13 +17,13 @@ import (
 	"unicode/utf8"
 )
 
-// Лимиты совпадают с теми, что проверяет страница: сервер не должен принимать больше,
-// чем интерфейс может показать в колонке 8×8.
+// The limits match the ones the page enforces: the server must not accept more than
+// the interface can show in its 8×8 grid.
 const (
 	currentVersion = 1
-	// Худший случай — 64 матрицы по 16 портов, каждый с подписью на 32 символа и шестью тегами
-	// по 16 символов (кириллица занимает по два байта). Тест TestMaxDocumentFitsBodyLimit
-	// считает этот размер и падает, если лимит станет меньше.
+	// Worst case: 64 matrices with 16 ports each, every port with a 32-character label and six 16-character tags
+	// (Cyrillic takes two bytes per character). TestMaxDocumentFitsBodyLimit
+	// computes this size and fails if the limit becomes smaller.
 	maxBodyBytes   = 512 << 10
 	maxDevices     = 64
 	maxLabelRunes  = 32
@@ -32,51 +32,51 @@ const (
 	portCount      = 8
 )
 
-// macPattern принимает MAC с двоеточиями в любом регистре: так его присылает матрица и так его
-// хранит страница. Канонический вид — верхний регистр, его задаёт normalize.
+// macPattern accepts a colon-separated MAC in any case: the matrix sends it that way, and the page stores it
+// that way too. The canonical form is upper case, set by normalize.
 var macPattern = regexp.MustCompile(`^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$`)
 
-// Document — весь файл настроек. Поле version нужно, чтобы при смене формата старый файл
-// не разобрали как новый.
+// Document is the whole settings file. The version field lets an old file be rejected
+// instead of being parsed as a new format.
 type Document struct {
-	// Version — версия формата; сейчас всегда currentVersion.
+	// Version is the format version; it is always currentVersion for now.
 	Version int `json:"version"`
-	// Devices — настройки матриц по каноническому MAC (верхний регистр, двоеточия).
+	// Devices holds the settings per matrix, keyed by canonical MAC (upper case, colons).
 	Devices map[string]Device `json:"devices"`
 }
 
-// Device — настройки одной матрицы.
+// Device holds the settings of one matrix.
 type Device struct {
-	// IO — подписи входов и выходов этой матрицы.
+	// IO holds the labels of this matrix's inputs and outputs.
 	IO IO `json:"io"`
 }
 
-// IO — подписи входов и выходов. Ключи — номера портов строкой, как их отдаёт страница.
+// IO holds the labels of inputs and outputs. Keys are port numbers as strings, as the page sends them.
 type IO struct {
-	// In — входы, ключи "1".."8".
+	// In holds the inputs, keyed "1".."8".
 	In map[string]Port `json:"in"`
-	// Out — выходы, ключи "1".."8".
+	// Out holds the outputs, keyed "1".."8".
 	Out map[string]Port `json:"out"`
 }
 
-// Port — подпись и теги одного входа или выхода.
+// Port holds the label and tags of one input or output.
 type Port struct {
-	// Label — подпись; пустая строка значит «как по умолчанию».
+	// Label is the label; an empty string means the default name.
 	Label string `json:"label"`
-	// Tags — теги в порядке добавления.
+	// Tags are kept in the order they were added.
 	Tags []Tag `json:"tags"`
 }
 
-// Tag — только текст. Поле цвета страница раньше хранила в записи; неизвестные поля при разборе
-// просто отбрасываются, поэтому старые записи переходят в новый формат без цвета.
+// Tag holds only the text. An older page version also stored a color here; unknown fields are
+// dropped during parsing, so old records move to the new format without a color.
 type Tag struct {
-	// Text — текст тега; пустой быть не может.
+	// Text is the tag text; it cannot be empty.
 	Text string `json:"text"`
 }
 
-// normalize приводит документ к каноническому виду до проверки и записи. MAC в верхнем регистре:
-// иначе одна матрица оказалась бы в файле под двумя ключами. Пустые коллекции — объекты и массивы,
-// а не null: клиент, который ждёт объект, падал бы на null.
+// normalize brings a document to canonical form before validation and writing. MACs are upper case,
+// otherwise one matrix could end up under two keys. Empty collections are objects and arrays,
+// not null, because a client expecting an object would fail on null.
 func normalize(doc *Document) error {
 	devices := make(map[string]Device, len(doc.Devices))
 	for mac, device := range doc.Devices {
@@ -92,7 +92,7 @@ func normalize(doc *Document) error {
 	return nil
 }
 
-// normalizePorts убирает пробелы по краям подписей и тегов: в файл пишем то, что покажем.
+// normalizePorts trims spaces around labels and tags: the file stores exactly what is shown.
 func normalizePorts(ports map[string]Port) map[string]Port {
 	if ports == nil {
 		return map[string]Port{}
@@ -110,9 +110,9 @@ func normalizePorts(ports map[string]Port) map[string]Port {
 	return ports
 }
 
-// validate проверяет документ целиком и возвращает первую найденную ошибку: клиенту хватает
-// одной причины, а список всех ошибок усложнил бы ответ. Обход map идёт по отсортированным
-// ключам, иначе один и тот же документ давал бы разные сообщения от запуска к запуску.
+// validate checks the whole document and returns the first error: one reason is enough for the client,
+// and a full list would complicate the response. Maps are walked in sorted key order,
+// otherwise the same document would produce different messages from run to run.
 func validate(doc *Document) error {
 	if doc.Version != currentVersion {
 		return fmt.Errorf("версия %d не поддерживается", doc.Version)
@@ -150,7 +150,7 @@ func validatePorts(ports map[string]Port) error {
 			return fmt.Errorf("номер порта %q вне 1–%d", number, portCount)
 		}
 		port := ports[number]
-		// Подпись может быть пустой (значит «как по умолчанию»), но из одних пробелов — нет.
+		// A label may be empty (meaning the default name), but not made of spaces only.
 		if port.Label != "" && strings.TrimSpace(port.Label) == "" {
 			return fmt.Errorf("порт %s: подпись из одних пробелов", number)
 		}
@@ -161,7 +161,7 @@ func validatePorts(ports map[string]Port) error {
 			return fmt.Errorf("порт %s: тегов больше %d", number, maxTagsPerPort)
 		}
 		for _, tag := range port.Tags {
-			// Пустой тег не имеет смысла: точки и текста не будет, а в списке он выглядел бы сломанным.
+			// An empty tag makes no sense: it would show no dot and no text, and look broken in the list.
 			if strings.TrimSpace(tag.Text) == "" {
 				return fmt.Errorf("порт %s: пустой тег", number)
 			}
@@ -173,15 +173,15 @@ func validatePorts(ports map[string]Port) error {
 	return nil
 }
 
-// validPortNumber — порт в виде строки из одной цифры 1–8. Ведущие нули и пробелы не принимаем,
-// иначе один порт мог бы оказаться записан под двумя ключами.
+// validPortNumber accepts a port as a single digit 1–8. Leading zeros and spaces are not accepted,
+// otherwise one port could be stored under two keys.
 func validPortNumber(number string) bool {
 	return len(number) == 1 && number[0] >= '1' && number[0] <= '0'+portCount
 }
 
-// validateText ограничивает длину и отсекает символы, которые ломают отображение: управляющие
-// (перевод строки ломал бы сетку) и формата Cf (ZWSP и bidi-override не видны глазом, но меняют
-// вид заголовка). Пробелы по краям к этому моменту уже убраны normalize.
+// validateText limits the length and rejects characters that break the display: control characters
+// (a newline would break the grid) and format characters Cf (ZWSP and bidi overrides are invisible but change
+// how a heading looks). Spaces at the edges have already been removed by normalize.
 func validateText(text string, maxRunes int) error {
 	if utf8.RuneCountInString(text) > maxRunes {
 		return fmt.Errorf("длиннее %d символов", maxRunes)
@@ -194,14 +194,14 @@ func validateText(text string, maxRunes int) error {
 	return nil
 }
 
-// Store хранит документ в одном файле. Запись атомарная: при падении процесса старый файл
-// остаётся целым, а не наполовину переписанным.
+// Store keeps the document in one file. Writes are atomic: if the process crashes, the old file
+// stays intact instead of being half-overwritten.
 type Store struct {
 	path string
 	mu   sync.Mutex
 }
 
-// Load читает документ. Отсутствующий файл — не ошибка: первый запуск начинается с пустых настроек.
+// Load reads the document. A missing file is not an error: the first run starts with empty settings.
 func (s *Store) Load() (*Document, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -220,10 +220,10 @@ func (s *Store) Load() (*Document, error) {
 	return &doc, nil
 }
 
-// Save пишет документ во временный файл в том же каталоге, сбрасывает его на диск и только
-// потом переименовывает. rename внутри одного каталога атомарен, поэтому читатель видит либо
-// старый файл, либо новый. Каталог сбрасываем после rename: иначе при потере питания сам
-// переименованный файл может не попасть на диск.
+// Save writes the document to a temporary file in the same directory, flushes it to disk, and only then
+// renames it. A rename within one directory is atomic, so a reader sees either
+// the old file or the new one. The directory is flushed after the rename; otherwise a power loss could leave
+// the renamed file missing from disk.
 func (s *Store) Save(doc *Document) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -238,8 +238,8 @@ func (s *Store) Save(doc *Document) error {
 		return err
 	}
 	tmpName := tmp.Name()
-	// После успешного rename файла уже нет, и Remove вернёт ошибку. Это нормально: цель —
-	// убрать временный файл, если что-то пошло не так.
+	// After a successful rename the temporary file no longer exists, so Remove returns an error. That is expected: the goal is
+	// to clean up the temporary file if something went wrong.
 	defer os.Remove(tmpName)
 
 	if _, err := tmp.Write(data); err != nil {
@@ -268,8 +268,8 @@ func syncDir(dir string) error {
 	return handle.Sync()
 }
 
-// newHandler собирает HTTP-интерфейс. Маршруты с методом в шаблоне: чужой метод получит 405
-// от самого роутера, без нашего кода.
+// newHandler builds the HTTP interface. Routes include the method in the pattern, so a wrong method gets 405
+// from the router itself, without our code.
 func newHandler(store *Store) http.Handler {
 	mux := http.NewServeMux()
 
@@ -288,7 +288,7 @@ func newHandler(store *Store) http.Handler {
 	})
 
 	mux.HandleFunc("PUT /api/config", func(w http.ResponseWriter, r *http.Request) {
-		// Лимит тела ограничиваем до разбора: иначе большой JSON занял бы память раньше проверок.
+		// The body limit is applied before parsing; otherwise a large JSON would use memory before any checks run.
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 		if err != nil {
 			var tooLarge *http.MaxBytesError

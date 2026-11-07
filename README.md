@@ -31,7 +31,17 @@ bash install.sh
 
 The script downloads `compose.yaml` into `./hdmi-matrix`, creates `.env` with a random password (printed once) and the latest release version, pulls the published image from `ghcr.io` and starts the container. It waits until the sign-in works, then prints the address. Options: `--dir`, `--version`, `--port`, `--bind`, `--user`, `--password`; run `bash install.sh --help`.
 
-Re-running the script keeps your `.env`. To move to another release run `bash install.sh --version 0.2.0` in the same folder, or `docker compose pull && docker compose up -d` after changing `HDMI_UI_VERSION` in `.env` yourself.
+Re-running the script keeps your `.env`.
+
+### Updating
+
+`bash install.sh update` pulls the newest release (or `--version X.Y.Z`) and recreates the container only if the image changed. A failed download leaves the running container untouched. Run it from cron to keep the container up to date, for example every night at 04:00:
+
+```bash
+0 4 * * * bash /path/to/install.sh update --dir /path/to/hdmi-matrix >> /path/to/hdmi-matrix/update.log 2>&1
+```
+
+A lock folder prevents overlapping runs. The update follows the latest release, including new major versions; pin a version with `--version` if you need to stay on one.
 
 Prefer to set it up by hand? Copy `compose.yaml` and `.env.example` to a folder as `.env`, change `UI_PASSWORD`, then run `docker compose pull && docker compose up -d`. To build from source, use `docker compose -f compose.dev.yaml up -d --build`.
 

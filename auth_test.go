@@ -81,7 +81,7 @@ func TestSessionTokensAreUniqueAndLongEnough(t *testing.T) {
 	}
 }
 
-// noRedirects нужен, чтобы видеть ответы входа, а не то, куда они ведут.
+// noRedirects lets tests see the sign-in responses themselves, not where they redirect to.
 func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 func TestLoginFlowSetsCookieAttributes(t *testing.T) {

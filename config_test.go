@@ -14,7 +14,7 @@ import (
 
 const testMAC = "14:C4:72:A2:80:6A"
 
-// doc собирает документ с одной матрицей; тесты меняют только то, что проверяют.
+// doc builds a document with one matrix; tests change only what they check.
 func doc(io IO) *Document {
 	return &Document{Version: currentVersion, Devices: map[string]Device{testMAC: {IO: io}}}
 }
@@ -161,7 +161,7 @@ func TestHandlerGetEmptyDocument(t *testing.T) {
 
 func TestHandlerPutThenGetDropsLegacyColor(t *testing.T) {
 	handler := newHandler(&Store{path: filepath.Join(t.TempDir(), "config.json")})
-	// Так выглядела запись в старой версии страницы: у тега было поле color.
+	// This is how an old page version stored a record: the tag had a color field.
 	body := `{"version":1,"devices":{"` + testMAC + `":{"io":{"in":{"1":{"label":"Blu-ray","tags":[{"text":"HDR","color":"#7aa2f7"}]}},"out":{}}}}}`
 
 	put := httptest.NewRecorder()
@@ -326,8 +326,8 @@ func TestValidateErrorIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestMaxDocumentFitsBodyLimit считает худший допустимый документ и проверяет, что он проходит
-// лимит тела. Без этого теста комментарий у maxBodyBytes мог бы снова стать неверным.
+// TestMaxDocumentFitsBodyLimit computes the worst valid document and checks that it fits
+// the body limit. Without this test the comment on maxBodyBytes could become wrong again.
 func TestMaxDocumentFitsBodyLimit(t *testing.T) {
 	label := strings.Repeat("я", maxLabelRunes)
 	tag := strings.Repeat("я", maxTagRunes)
@@ -382,8 +382,8 @@ func TestHandlerGetReturnsErrorOnCorruptFile(t *testing.T) {
 	}
 }
 
-// TestConcurrentSaveAndLoad запускается под -race: параллельные PUT и GET не должны
-// гоняться за файлом и не должны отдавать частично записанный документ.
+// TestConcurrentSaveAndLoad runs under -race: concurrent PUT and GET must not
+// race on the file or return a partially written document.
 func TestConcurrentSaveAndLoad(t *testing.T) {
 	store := &Store{path: filepath.Join(t.TempDir(), "config.json")}
 	if err := store.Save(doc(IO{})); err != nil {

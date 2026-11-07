@@ -1,5 +1,5 @@
-// Языки интерфейса. Словари лежат в lang/<код>.json; русский подгружается всегда,
-// как запасной вариант, поэтому пропущенный ключ в другом языке не выводит сырой ключ.
+// Interface languages. Dictionaries live in lang/<code>.json; Russian is always loaded
+// as a fallback, so a key missing in another language never shows a raw key.
 
 export const LANGUAGES = [
   { code: "uk", name: "Українська", locale: "uk-UA" },
@@ -15,7 +15,7 @@ export const LANGUAGES = [
   { code: "ru", name: "Русский", locale: "ru-RU" },
 ];
 
-// Язык по умолчанию и запасной словарь для пропущенных ключей.
+// Default language and the fallback dictionary for missing keys.
 const FALLBACK = "en";
 const STORE_KEY = "hdmi-matrix.lang";
 const dictionaries = {};
@@ -34,18 +34,18 @@ function storedLanguage() {
   try {
     return localStorage.getItem(STORE_KEY);
   } catch {
-    return null; // localStorage может быть недоступен: язык выберем по браузеру
+    return null; // localStorage may be unavailable: the language falls back to the browser setting
   }
 }
 
-// Язык по умолчанию — английский. Сохранённый выбор пользователя имеет приоритет.
+// The default language is English. A language the user saved takes priority.
 function detectLanguage() {
   const stored = storedLanguage();
   return LANGUAGES.some((language) => language.code === stored) ? stored : FALLBACK;
 }
 
-// Подстановка параметров: t("err.noResponse", { ip, status }) → "нет ответа по …".
-// Неизвестный параметр оставляем как есть, чтобы ошибка в тексте была видна.
+// Parameter substitution: t("err.noResponse", { ip, status }) → "no response from …".
+// An unknown parameter is left as is, so the mistake in the text is visible.
 export function t(key, params = {}) {
   const template = dictionaries[current]?.[key] ?? dictionaries[FALLBACK]?.[key] ?? key;
   return template.replace(/\{(\w+)\}/g, (match, name) => (name in params ? String(params[name]) : match));
@@ -55,7 +55,7 @@ export function currentLanguage() {
   return LANGUAGES.find((language) => language.code === current);
 }
 
-// Текст для элементов с data-i18n (текст), data-i18n-placeholder и data-i18n-aria.
+// Text for elements with data-i18n (text), data-i18n-placeholder and data-i18n-aria.
 export function applyStaticTexts(root = document) {
   for (const element of root.querySelectorAll("[data-i18n]")) element.textContent = t(element.dataset.i18n);
   for (const element of root.querySelectorAll("[data-i18n-placeholder]")) {
@@ -73,7 +73,7 @@ export async function setLanguage(code) {
   try {
     localStorage.setItem(STORE_KEY, code);
   } catch {
-    // Без сохранения язык выберется заново при перезагрузке.
+    // Without saving, the language is chosen again after a reload.
   }
   applyStaticTexts();
 }

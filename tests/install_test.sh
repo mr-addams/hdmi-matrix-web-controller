@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Тесты install.sh без Docker и сети: docker и curl подменяются заглушками через PATH.
-# Каждый случай работает в отдельной копии скрипта, поэтому настоящий .env репозитория не трогаем.
-# Запуск: bash tests/install_test.sh
+# Tests for install.sh that need no Docker and no network: docker and curl are replaced by stubs on PATH.
+# Each case runs in its own copy of the script, so the repository's real .env is never touched.
+# Run with: bash tests/install_test.sh
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,8 +22,8 @@ fail() {
   echo "       вывод: $OUT"
 }
 
-# Заглушка docker пишет вызовы в лог; FAKE_DOCKER_EXIT имитирует падение compose.
-# Заглушка curl читает конфиг из stdin (так его видит и настоящий скрипт), отдаёт FAKE_HTTP_CODE.
+# The docker stub logs its calls; FAKE_DOCKER_EXIT simulates a failing compose command.
+# The curl stub reads its config from stdin (as the real script sends it) and returns FAKE_HTTP_CODE.
 make_case() {
   CASE_DIR=$(mktemp -d "$WORK_DIR/case.XXXX")
   cp "$REPO_DIR/install.sh" "$CASE_DIR/install.sh"
@@ -38,7 +38,7 @@ EOF
   cat > "$CASE_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 echo "curl $*" >> "$STUB_LOG"
-# Скачивание compose.yaml и запрос последнего релиза: отдаём заранее подготовленные ответы.
+# Downloads of compose.yaml and the latest-release lookup get canned answers.
 out=""; prev=""; url=""
 for arg in "$@"; do
   if [ "$prev" = "-o" ]; then out="$arg"; fi
@@ -51,7 +51,7 @@ case "$url" in
 esac
 config=$(cat)
 echo "curl-config: $config" >> "$STUB_LOG"
-# Вход в установщике проверяет редирект: по умолчанию имитируем успешный вход на главную.
+# The installer checks sign-in by its redirect; by default the stub simulates a successful redirect to the main page.
 if [ -n "${FAKE_HTTP_CODE:-}" ]; then printf '%s' "$FAKE_HTTP_CODE"; exit 0; fi
 base=$(printf '%s\n' "$config" | sed -n 's|^url = "\(.*\)/login"$|\1|p')
 printf '303 %s/' "$base"
@@ -65,7 +65,13 @@ EOF
   unset FAKE_HTTP_CODE FAKE_DOCKER_EXIT FAKE_PULL_EXIT
 }
 
-# Запускает install.sh из копии случая; результат в OUT и RC.
+# Runs the update mode: the subcommand must come first, so it is not wrapped by run_install.
+run_update() {
+  OUT=$(cd "$CASE_DIR" && bash ./install.sh update --dir . 2>&1)
+  RC=$?
+}
+
+# Runs install.sh from the case copy; the result goes to OUT and RC.
 run_install() {
   OUT=$(cd "$CASE_DIR" && bash ./install.sh --dir . "$@" 2>&1)
   RC=$?
@@ -96,7 +102,7 @@ expect_no_log() {
   if grep -qF -- "$needle" "$STUB_LOG"; then fail "$name: есть в логе «$needle»"; else pass "$name"; fi
 }
 
-# ── Валидация аргументов: при любом неверном значении — код 2 и без вызова docker ──
+# ── Argument validation: any invalid value gives exit code 2 and never calls docker ──
 
 make_case
 run_install --port 99999999999999999999
@@ -119,7 +125,7 @@ make_case; run_install --help
 expect_rc 0 "--help завершается успешно"
 expect_output "Использование" "--help печатает справку"
 
-# ── Новая установка ──
+# ── Fresh install ──
 
 make_case
 run_install --port 18080 --bind 0.0.0.0 --user ops --password s3cret --version 0.3.0
@@ -158,7 +164,7 @@ fi
 expect_output "Пароль (сгенерирован, сохранён в .env):" "сгенерированный пароль печатается один раз"
 expect_output "Логин: admin" "логин по умолчанию admin"
 
-# ── Ошибки контейнера ──
+# ── Container errors ──
 
 make_case
 FAKE_HTTP_CODE="303 http://127.0.0.1:8080/login?error=1" run_install --password s3cret
@@ -169,7 +175,7 @@ make_case
 FAKE_DOCKER_EXIT=1 run_install --password s3cret
 if [ "$RC" -ne 0 ]; then pass "падение compose останавливает установку"; else fail "падение compose не остановило установку"; fi
 
-# ── Существующий .env ──
+# ── Existing .env ──
 
 make_case
 printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\nHDMI_UI_VERSION=0.1.0\n' > "$CASE_DIR/.env"
@@ -200,7 +206,7 @@ printf 'UI_USER=admin\nUI_PASSWORD=\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0
 run_install
 expect_rc 2 "пустой пароль в .env отклоняется"
 
-# ── Скачивание и версии ──
+# ── Download and versions ──
 
 make_case
 rm -f "$CASE_DIR/compose.yaml"
@@ -229,6 +235,41 @@ make_case
 FAKE_PULL_EXIT=1 run_install --password s3cret
 expect_rc 1 "не скачался образ — установка останавливается"
 expect_output "Не удалось скачать образ" "ошибка скачивания образа названа"
+
+# ── update ──
+
+make_case
+printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\nHDMI_UI_VERSION=0.1.0\n' > "$CASE_DIR/.env"
+run_update
+expect_rc 0 "update переходит на последний релиз"
+if grep -q '^HDMI_UI_VERSION=0.2.0$' "$CASE_DIR/.env" && grep -q '^UI_PASSWORD=keepme$' "$CASE_DIR/.env"; then pass "update меняет версию, пароль сохраняет"; else fail "update испортил .env"; fi
+expect_log "docker compose pull" "update скачивает образ"
+expect_log "docker compose up -d" "update пересоздаёт контейнер при необходимости"
+expect_output "Обновлено: 0.1.0 → 0.2.0" "update сообщает об обновлении"
+
+make_case
+printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\nHDMI_UI_VERSION=0.2.0\n' > "$CASE_DIR/.env"
+run_update
+expect_rc 0 "update без новой версии проходит"
+expect_output "Уже актуально" "update сообщает, что версия актуальна"
+
+make_case
+printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\nHDMI_UI_VERSION=0.1.0\n' > "$CASE_DIR/.env"
+FAKE_PULL_EXIT=1 run_update
+expect_rc 1 "update при ошибке загрузки завершается с кодом 1"
+if grep -q '^HDMI_UI_VERSION=0.1.0$' "$CASE_DIR/.env"; then pass "при ошибке загрузки версия в .env возвращена"; else fail "при ошибке загрузки версия в .env не возвращена"; fi
+expect_no_log "docker compose up -d" "при ошибке загрузки контейнер не перезапускается"
+
+make_case
+run_update
+expect_rc 1 "update без установки сообщает об этом"
+expect_output "нечего обновлять" "update без .env не падает молча"
+
+make_case
+printf 'UI_USER=admin\nUI_PASSWORD=keepme\nMATRIX_UI_PORT=8080\nMATRIX_UI_BIND=127.0.0.1\nHDMI_UI_VERSION=0.1.0\n' > "$CASE_DIR/.env"
+mkdir "$CASE_DIR/.update.lock"
+run_update
+expect_rc 1 "второй update не запускается поверх первого"
 
 echo
 echo "Пройдено: $PASSED, провалено: $FAILED"

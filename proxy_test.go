@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// fakeMatrix изображает матрицу: записывает, что до неё дошло, и отвечает фиксированным телом.
+// fakeMatrix stands in for a matrix: it records what reached it and answers with a fixed body.
 type fakeMatrix struct {
 	path, query, authorization, cookie, custom, contentType string
 }
@@ -31,7 +31,7 @@ func startFakeMatrix(t *testing.T) (*httptest.Server, *fakeMatrix) {
 	return server, seen
 }
 
-// loopbackAllowed пускает тесты на 127.0.0.1: в реальном коде доступ ограничен приватными сетями.
+// loopbackAllowed lets tests reach 127.0.0.1; the real code only allows private networks.
 func loopbackAllowed(ip net.IP) bool { return ip.IsLoopback() }
 
 func portOf(server *httptest.Server) string {
@@ -79,7 +79,7 @@ func TestDeviceProxyForwardsPathQueryAndDropsAuthorization(t *testing.T) {
 	if seen.authorization != "" {
 		t.Errorf("логин страницы ушёл матрице: %q", seen.authorization)
 	}
-	// Токен сессии — тот же класс секрета: он не должен уходить устройству в сети.
+	// A session token is the same kind of secret: it must never reach a device on the network.
 	if seen.cookie != "" {
 		t.Errorf("cookie сессии ушёл матрице: %q", seen.cookie)
 	}
@@ -120,7 +120,7 @@ func TestDeviceProxyForbidsPublicAddresses(t *testing.T) {
 }
 
 func TestDeviceProxyReportsUnreachableMatrix(t *testing.T) {
-	// Порт, который сразу закрыли: соединение получит отказ, а не ждёт таймаута.
+	// A port that was just closed: the connection is refused at once instead of waiting for a timeout.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

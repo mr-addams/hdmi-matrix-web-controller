@@ -36,7 +36,7 @@
 
   <nav class="tabs" id="tabs" aria-label="Матрицы"></nav>
 
-  <!-- Холодный старт и добавление матрицы: без матриц страница ничего не показывает. -->
+  <!-- Cold start and adding a matrix: without matrices the page shows nothing else. -->
   <section class="panel welcome" id="welcome" hidden>
     <h2 id="addTitle" data-i18n="welcome.title">Добавить матрицу</h2>
     <p class="hint" id="emptyHint" data-i18n="welcome.empty" hidden>Матриц пока нет. Укажи IP устройства в локальной сети.</p>
@@ -147,12 +147,12 @@
 
 </div>
 
-<!-- Меню правого клика по заголовку входа или выхода. Позицию ставит JS. -->
+<!-- Right-click menu for an input or output header. JavaScript sets the position. -->
 <div class="io-menu" id="ioMenu" hidden>
   <button type="button" class="io-menu-item" id="ioMenuEdit"></button>
 </div>
 
-<!-- Редактор подписи и тегов: в стиле стекла, правки применяются только по «Сохранить». -->
+<!-- Label and tag editor in glass style; changes apply only on "Save". -->
 <div class="modal" id="ioModal" hidden>
   <form class="modal-card io-editor" id="ioForm" autocomplete="off">
     <h3 id="ioTitle"></h3>
@@ -176,7 +176,7 @@
   </form>
 </div>
 
-<!-- Подтверждение в стиле стекла вместо системного окна. -->
+<!-- Confirmation in glass style instead of a system dialog. -->
 <div class="modal" id="confirmModal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText">
     <h3 id="confirmTitle" data-i18n="confirm.title">Подтверждение</h3>

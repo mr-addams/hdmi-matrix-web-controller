@@ -7,7 +7,7 @@
 <meta name="color-scheme" content="dark">
 <title>HDMI Matrix · Sign in</title>
 <style>
-  /* Палитра страницы управления: вход выглядит как её продолжение. */
+  /* Palette of the control page: the sign-in looks like a continuation of it. */
   :root {
     --bg: #1a1b26; --panel: #1f2335; --panel-hi: #292e42; --border: #3b4261;
     --text: #c0caf5; --muted: #7a84b3; --blue: #7aa2f7; --cyan: #7dcfff; --red: #f7768e;
@@ -64,7 +64,7 @@
   </form>
 </main>
 <script>
-  // Ошибку показываем только после неудачной попытки: сервер возвращает ?error=1.
+  // Show the error only after a failed attempt: the server returns ?error=1.
   if (new URLSearchParams(location.search).has("error")) document.getElementById("error").hidden = false;
 </script>
 </body>
