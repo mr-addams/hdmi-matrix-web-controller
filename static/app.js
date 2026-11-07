@@ -1,5 +1,5 @@
-// Страница управления несколькими матрицами. Протокол — в protocol.js, тексты — в lang/*.json
-// через i18n.js, здесь интерфейс и хранение. Все матрицы и их состояние — в localStorage.
+// Control page for several matrices. The protocol is in protocol.js, texts are in lang/*.json
+// via i18n.js; this file holds the UI and storage. All matrices and their state live in localStorage.
 
 import {
   AUDIO_MODES,
@@ -18,34 +18,34 @@ import {
 import { applyStaticTexts, currentLanguage, initI18n, LANGUAGES, setLanguage, t } from "./i18n.js";
 
 const STORE_KEY = "hdmi-matrix.v1";
-// Настройки отображения на сервере: адрес обслуживает hdmi-ui, версия формата совпадает с config.go.
+// Display settings on the server: the address is served by hdmi-ui; the format version matches config.go.
 const CONFIG_URL = "/api/config";
 const IO_CONFIG_VERSION = 1;
 const IO_CONFIG_TIMEOUT_MS = 3000;
 const POLL_MS = 3000;
 const REQUEST_TIMEOUT_MS = 6000;
-// Для проверки доступности таймаут короче: офлайн-матрица не должна держать опрос дольше секунды.
+// The availability check uses a shorter timeout: an offline matrix must not hold up polling for longer than a second.
 const PRESENCE_TIMEOUT_MS = 1500;
 const INPUTS = [1, 2, 3, 4, 5, 6, 7, 8];
 const OUTPUTS = [1, 2, 3, 4, 5, 6, 7, 8];
 const FLAG_KEYS = ["hdr", "threeD", "bit30", "bit36", "bit48"];
-// Копии TV: код EDID → номер экрана. Коды 5–9 и A–C, см. protocol.js.
+// TV copies: EDID code → screen number. Codes 5–9 and A–C, see protocol.js.
 const EDID_COPY_SOURCE = { 5: 1, 6: 2, 7: 3, 8: 4, 9: 5, A: 6, B: 7, C: 8 };
-// Палитра точек у тегов. Цвет берётся из текста тега (tagColor), поэтому одинаковые теги всегда одного цвета.
+// Palette for tag dots. The color comes from the tag text (tagColor), so identical tags always have the same color.
 const IO_COLORS = [
   "#7aa2f7", "#7dcfff", "#bb9af7", "#9ece6a", "#e0af68", "#ff9e64", "#f7768e", "#73daca",
   "#2ac3de", "#b4f9f8", "#c3e88d", "#ffc777", "#ff007c", "#c099ff", "#89ddff", "#d7827e",
 ];
-// Лимиты держат матрицу читаемой: длинная подпись уже не влезает в колонку 8×8.
+// The limits keep the matrix readable: a long label no longer fits the 8×8 grid column.
 const IO_LABEL_MAX = 32;
 const IO_TAG_MAX = 16;
 const IO_MAX_TAGS = 6;
 
 const $ = (id) => document.getElementById(id);
 
-// ── Хранилище ────────────────────────────────────────────────────────────────────
-// Матрицы ключуются по MAC: он постоянный, а IP может смениться. Состояние интерфейса
-// (раскрытые блоки) хранится рядом, маршрутизация и EDID — никогда: их читаем с устройства.
+// ── Storage ────────────────────────────────────────────────────────────────────
+// Matrices are keyed by MAC: it is permanent, while the IP may change. UI state
+// (expanded blocks) is stored alongside; routing and EDID are never stored: they are read from the device.
 
 function emptyStore() {
   return { active: null, devices: {} };
@@ -56,7 +56,7 @@ function loadStore() {
     const parsed = JSON.parse(localStorage.getItem(STORE_KEY));
     return parsed && typeof parsed.devices === "object" ? parsed : emptyStore();
   } catch {
-    return emptyStore(); // localStorage может быть недоступен: работаем без сохранения
+    return emptyStore(); // localStorage may be unavailable: work without saving
   }
 }
 
@@ -64,21 +64,21 @@ function saveStore() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
   } catch {
-    // Без сохранения интерфейс всё равно работает, просто состояние не переживёт перезагрузку.
+    // Without saving, the interface still works; the state just does not survive a reload.
   }
 }
 
 const store = loadStore();
 
-// ── Состояние рантайма ───────────────────────────────────────────────────────────
+// ── Runtime state ───────────────────────────────────────────────────────────
 
 const runtime = {
-  live: null,            // последнее состояние активной матрицы
-  busy: false,           // идёт переключение: опрос не должен затирать подсветку
-  edidDirty: new Set(),  // входы, где EDID правят прямо сейчас
+  live: null,            // last known state of the active matrix
+  busy: false,           // a switch is in progress: polling must not overwrite the highlight
+  edidDirty: new Set(),  // inputs whose EDID is being edited right now
   netDirty: false,
-  renderedMac: null,     // для какой матрицы построены строки EDID
-  online: {},            // доступность по MAC: true/false; нет ключа — ещё не проверяли
+  renderedMac: null,     // the matrix the EDID rows were built for
+  online: {},            // availability by MAC: true/false; no key means not checked yet
   link: { ok: false, key: "link.nodata" },
   view: "loading",       // loading | ready | stale | offline
 };
@@ -87,9 +87,9 @@ function activeDevice() {
   return store.active ? store.devices[store.active] ?? null : null;
 }
 
-// ── Запросы к матрице ────────────────────────────────────────────────────────────
-// Единая точка входа для всех обращений к устройству. Очередь — на каждую матрицу отдельно:
-// зависшая или выключенная матрица не задерживает запросы к остальным.
+// ── Requests to the matrix ────────────────────────────────────────────────────────────
+// The single entry point for all device requests. Queues are per matrix:
+// a stuck or switched-off matrix does not delay requests to the others.
 
 const deviceQueues = new Map();
 function queueDevice(ip, task) {
@@ -99,7 +99,7 @@ function queueDevice(ip, task) {
   return run;
 }
 
-// Сессия истекла или её не было: страница уходит на вход, а не висит в состоянии «нет связи».
+// The session expired or was never there: the page goes to sign-in instead of hanging in a "no connection" state.
 function checkSession(response) {
   if (response.status === 401) {
     location.assign("login");
@@ -113,8 +113,8 @@ function deviceRequest(ip, url, { method = "GET", body, headers, timeout = REQUE
   return queued ? queueDevice(ip, run) : run();
 }
 
-// Команды записи: ответ не важен, матрица часто отвечает пустым или рвёт соединение (прокси вернёт 502).
-// Правду показывает только последующее чтение состояния.
+// Write commands: the response does not matter; the matrix often answers empty or drops the connection (the proxy returns 502).
+// Only a later state read tells the truth.
 function sendCommand(ip, url, options) {
   return deviceRequest(ip, url, options).catch(() => null);
 }
@@ -125,8 +125,8 @@ async function readState(ip) {
   return parseState(await response.text());
 }
 
-// Проверка, что по адресу отвечает именно матрица: AutoGetAllData разбирается в 22 поля,
-// AutoGetRevID отдаёт код ревизии вида «52=…».
+// Checks that the address really answers as a matrix: AutoGetAllData must parse into 22 fields,
+// AutoGetRevID returns a revision code of the form "52=…".
 async function probeMatrix(ip) {
   return queueDevice(ip, async () => {
     const [stateResponse, revisionResponse] = await Promise.all([
@@ -140,7 +140,7 @@ async function probeMatrix(ip) {
   });
 }
 
-// ── Визуал: связь, состояние просмотра, ошибки ───────────────────────────────────
+// ── View: connection, view state, errors ───────────────────────────────────
 
 function setLink(ok, key) {
   runtime.link = { ok, key };
@@ -152,8 +152,8 @@ function renderLink() {
   $("linkText").textContent = t(runtime.link.key);
 }
 
-// Состояние просмотра: loading — данных ещё нет, offline — нет связи и данных нет,
-// stale — связи нет, но последние данные показываем приглушённо, ready — всё актуально.
+// View state: loading means no data yet, offline means no connection and no data,
+// stale means no connection but the last data is shown dimmed, ready means everything is current.
 const VIEW_TEXT = { loading: "loader.loading", offline: "link.bad", stale: "link.bad", ready: null };
 
 function setViewState(view) {
@@ -165,7 +165,7 @@ function setViewState(view) {
 function renderViewState() {
   const key = VIEW_TEXT[runtime.view];
   for (const element of document.querySelectorAll(".loader-text")) element.textContent = key ? t(key) : "";
-  // Указать новый адрес имеет смысл только когда матрица недоступна.
+  // Entering a new address makes sense only while the matrix is unreachable.
   for (const button of document.querySelectorAll(".loader-action")) button.hidden = runtime.view !== "offline";
 }
 
@@ -173,10 +173,10 @@ function showError(id, message) {
   $(id).textContent = message ?? "";
 }
 
-// ── Добавление, смена адреса и удаление ──────────────────────────────────────────
+// ── Adding, changing the address and removing ──────────────────────────────────────────
 
-// Режим «новый адрес» для уже добавленной матрицы: MAC — единственная связь с записью,
-// поэтому адрес принимаем только если отвечает матрица с тем же MAC.
+// "New address" mode for an already added matrix: the MAC is the only link to the record,
+// so an address is accepted only if a matrix with the same MAC answers.
 let addModeMac = null;
 
 function renderAddTitles() {
@@ -215,7 +215,7 @@ function showAddPanel() {
 
 async function addDevice(event) {
   event.preventDefault();
-  // Адрес может содержать порт: "192.168.1.50" или "192.168.1.50:8080". По умолчанию 80.
+  // The address may include a port: "192.168.1.50" or "192.168.1.50:8080". The default is 80.
   const parsed = parseHost($("addInput").value);
   showError("addError", "");
   if (parsed.error) {
@@ -251,14 +251,14 @@ async function addDevice(event) {
   }
 }
 
-// Подтверждение в стеклянном попапе вместо системного окна. Резолвится true/false.
+// Confirmation in a glass popup instead of a system dialog. Resolves to true/false.
 function askConfirm({ title, text, okLabel }) {
   const modal = $("confirmModal");
   $("confirmTitle").textContent = title;
   $("confirmText").textContent = text;
   $("confirmOk").textContent = okLabel;
   modal.hidden = false;
-  // Фокус на «Отмена»: случайный Enter не должен удалить матрицу.
+  // Focus starts on "Cancel": a stray Enter must not remove the matrix.
   $("confirmCancel").focus();
 
   return new Promise((resolve) => {
@@ -304,7 +304,7 @@ async function removeActive() {
   else showAddPanel();
 }
 
-// ── Вкладки матриц ───────────────────────────────────────────────────────────────
+// ── Matrix tabs ───────────────────────────────────────────────────────────────
 
 function renderTabs() {
   const tabs = $("tabs");
@@ -349,10 +349,10 @@ async function activate(mac) {
   runtime.edidDirty.clear();
   runtime.netDirty = false;
   runtime.renderedMac = null;
-  // Форма сети одна на все матрицы: без сброса на офлайн-матрице остались бы значения прошлой.
+  // There is one network form for all matrices: without a reset, an offline matrix would keep the previous matrix's values.
   $("netForm").reset();
   $("edidList").replaceChildren();
-  // Сразу очищаем вид: иначе на экране остаются «зелёные» ячейки прошлой матрицы.
+  // Clear the view at once: otherwise the previous matrix's "green" cells stay on screen.
   setViewState("loading");
   showError("routeError", "");
   renderIoLabels();
@@ -363,9 +363,9 @@ async function activate(mac) {
   await refresh();
 }
 
-// ── Подписи и теги входов и выходов ──────────────────────────────────────────────
-// Хранятся в записи матрицы (по MAC) вместе с адресом, поэтому переживают смену IP.
-// Пустая подпись значит «как по умолчанию»: в данных ничего не пишем.
+// ── Labels and tags of inputs and outputs ──────────────────────────────────────────────
+// Stored in the matrix record (by MAC) together with the address, so they survive an IP change.
+// An empty label means "default": nothing is written to the data.
 
 function ioEntry(device, kind, n, create = false) {
   if (!device) return null;
@@ -379,13 +379,13 @@ function ioDefaultName(kind, n) {
   return t(kind === "in" ? "matrix.in" : "matrix.out", { n });
 }
 
-// Подпись там, где нужно короткое имя (строки EDID): без подписи остаётся «IN n».
+// The label where a short name is needed (EDID rows): without a label it stays "IN n".
 function ioName(kind, n) {
   return ioEntry(activeDevice(), kind, n)?.label || ioDefaultName(kind, n);
 }
 
-// Цвет тега — функция от его текста: одинаковый тег всегда одного цвета, после перезагрузки тоже.
-// FNV-1a — простой хеш без зависимостей. Регистр и пробелы по краям не различаем: «HDR» и «hdr» — один тег.
+// A tag's color is a function of its text: the same tag always has the same color, also after a reload.
+// FNV-1a is a simple hash with no dependencies. Case and edge spaces are ignored: "HDR" and "hdr" are one tag.
 function tagColor(text) {
   let hash = 0x811c9dc5;
   for (const char of text.trim().toLowerCase()) {
@@ -395,7 +395,7 @@ function tagColor(text) {
   return IO_COLORS[hash % IO_COLORS.length];
 }
 
-// Один тег: точка цвета и текст. В матрице компактная версия, в редакторе — с кнопкой удаления.
+// One tag: a color dot and the text. The matrix shows a compact version; the editor adds a remove button.
 function tagChip(tag, variant) {
   const chip = el("span", `io-tag io-tag-${variant}`);
   const dot = el("i", "io-dot");
@@ -404,7 +404,7 @@ function tagChip(tag, variant) {
   return chip;
 }
 
-// Заголовок или строка выхода: «IN n» всегда, подпись второй строкой, теги под ней.
+// An input or output header: "IN n" always, the label on the second line, the tags below it.
 function fillIoCell(cell, kind, n) {
   const entry = ioEntry(activeDevice(), kind, n);
   const lines = [el("span", "io-num", ioDefaultName(kind, n))];
@@ -420,19 +420,19 @@ function fillIoCell(cell, kind, n) {
   cell.replaceChildren(...lines);
 }
 
-// Подписи, которые видны вне матрицы: заголовки и строки матрицы, имена входов в EDID.
+// Labels that show outside the matrix: the matrix headers and rows, and the input names in EDID.
 function renderIoLabels() {
   renderMatrixLabels();
   $("ioMenuEdit").textContent = t("io.edit");
   for (const row of document.querySelectorAll(".edid-row")) renderEdidRowLabels(row);
 }
 
-// ── Меню и редактор ──────────────────────────────────────────────────────────────
-// Правый клик по заголовку открывает меню, его пункт — редактор. Редактор работает с черновиком:
-// правки попадают в запись только после «Сохранить», Escape и «Отмена» их отбрасывают.
+// ── Menu and editor ──────────────────────────────────────────────────────────────
+// A right-click on a header opens a menu; its item opens the editor. The editor works on a draft:
+// changes reach the record only after "Save"; Escape and "Cancel" discard them.
 
-let ioTarget = null; // заголовок, для которого открыто меню
-let ioDraft = null;  // черновик редактора: { kind, n, label, tags }
+let ioTarget = null; // the header the menu is open for
+let ioDraft = null;  // editor draft: { kind, n, label, tags }
 
 function openIoMenu(event, kind, n) {
   event.preventDefault();
@@ -440,7 +440,7 @@ function openIoMenu(event, kind, n) {
   ioTarget = { kind, n };
   const menu = $("ioMenu");
   menu.hidden = false;
-  // Меню не должно уезжать за край окна: пункт у правого или нижнего края стал бы недоступен.
+  // The menu must not run off the window: an item at the right or bottom edge would become unreachable.
   const left = Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8);
   const top = Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8);
   menu.style.left = `${Math.max(8, left)}px`;
@@ -514,8 +514,8 @@ function saveIoDraft(event) {
   commitIo();
 }
 
-// Подписи и теги живут на сервере контейнера, чтобы их видели все браузеры. localStorage остаётся
-// запасным вариантом: если сервер недоступен, работаем с тем, что уже есть в браузере.
+// Labels and tags live on the container's server so that every browser sees them. localStorage stays
+// as a fallback: if the server is unreachable, work with what the browser already has.
 async function loadIoConfig() {
   let remote;
   try {
@@ -532,13 +532,13 @@ async function loadIoConfig() {
     }
     saveStore();
   } else if (Object.values(store.devices).some((device) => device.io)) {
-    // Первый запуск новой версии: подписи, накопленные в этом браузере, переезжают на сервер.
+    // First run of a new version: labels collected in this browser move to the server.
     pushIoConfig();
   }
 }
 
-// Отправляем подписи всех матриц целиком: объём мал, а частичные обновления усложнили бы сервер.
-// Ошибку не показываем в интерфейсе: подписи остаются в localStorage и уйдут при следующем изменении.
+// Labels for all matrices are sent as a whole: the payload is small, and partial updates would complicate the server.
+// The error is not shown in the UI: the labels stay in localStorage and are sent again on the next change.
 async function pushIoConfig() {
   const devices = {};
   for (const [mac, device] of Object.entries(store.devices)) {
@@ -558,14 +558,14 @@ async function pushIoConfig() {
   }
 }
 
-// Любое изменение подписей: сохранить в браузере, на сервере и перерисовать то, что их показывает.
+// Any label change: save in the browser and on the server, and redraw everything that shows them.
 function commitIo() {
   saveStore();
   renderIoLabels();
   pushIoConfig();
 }
 
-// ── Матрица ──────────────────────────────────────────────────────────────────────
+// ── Matrix ──────────────────────────────────────────────────────────────────────
 
 function buildMatrix() {
   const matrix = $("matrix");
@@ -574,7 +574,7 @@ function buildMatrix() {
     const head = document.createElement("div");
     head.className = "head";
     head.dataset.n = input;
-    // Меню и редактор подписи открываются правым кликом по заголовку; сами элементы живут весь сеанс.
+    // The label menu and editor open on a right-click on a header; the elements themselves live for the whole session.
     head.addEventListener("contextmenu", (event) => openIoMenu(event, "in", input));
     matrix.append(head);
   }
@@ -607,7 +607,7 @@ function buildMatrix() {
   }
 }
 
-// Подписи матрицы: вызывается при построении и при смене языка.
+// Matrix labels: called on build and on language change.
 function renderMatrixLabels() {
   for (const element of document.querySelectorAll(".head")) fillIoCell(element, "in", Number(element.dataset.n));
   for (const element of document.querySelectorAll(".out")) fillIoCell(element, "out", Number(element.dataset.n));
@@ -640,7 +640,7 @@ async function route(output, input) {
   if (runtime.busy || !runtime.live || !device) return;
   setBusy(true);
   showError("routeError", "");
-  // Подсветка сразу: матрица отвечает медленно, а пустой ответ — норма.
+  // Highlight at once: the matrix answers slowly, and an empty answer is normal.
   runtime.live.outputs[output - 1] = input;
   renderMatrix();
   try {
@@ -663,7 +663,7 @@ async function routeAll(input) {
   setBusy(true);
   showError("routeError", "");
   try {
-    // Выходы по одному: так устройство не путает команды.
+    // Outputs one by one: this way the device does not mix up the commands.
     for (const output of OUTPUTS) await sendCommand(device.ip, routeUrl(device.ip, output, input));
     runtime.live = await readState(device.ip);
     const stuck = OUTPUTS.filter((output) => runtime.live.outputs[output - 1] !== input);
@@ -682,7 +682,7 @@ function edidName(code) {
   return /^[1-4]$/.test(code) ? t(`edid.code.${code}`) : t("edid.copy", { n: EDID_COPY_SOURCE[code] ?? code });
 }
 
-// Раскрытые блоки EDID запоминаем на матрицу: после перезагрузки страница откроется так же.
+// Expanded EDID blocks are remembered per matrix: after a reload the page opens the same way.
 function rememberOpenRows() {
   const device = activeDevice();
   if (!device) return;
@@ -690,7 +690,7 @@ function rememberOpenRows() {
   saveStore();
 }
 
-// Флаг языка — SVG-файл: эмодзи-флаги на Windows выглядят как пара букв.
+// The language flag is an SVG file: emoji flags on Windows look like two letters.
 function flagImage(code) {
   const img = el("img", "flag-img");
   img.src = `flags/${code}.svg`;
@@ -756,7 +756,7 @@ function buildEdidRow(input) {
   apply.dataset.apply = "";
   apply.addEventListener("click", () => applyEdid(input, row));
 
-  // Редактирование спрятано в отдельный блок; оранжевое у его заголовка видно и свёрнутым.
+  // Editing is hidden in its own block; the orange marker on its header stays visible when collapsed.
   const edit = el("details", "edid-edit");
   const editSummary = el("summary");
   editSummary.dataset.editSummary = "";
@@ -764,7 +764,7 @@ function buildEdidRow(input) {
   editGrid.append(select, audio, toggles, apply);
   edit.append(editSummary, editGrid);
 
-  // Любое касание контрола помечает строку как редактируемую: опрос её не перетрёт.
+  // Touching any control marks the row as being edited: polling will not overwrite it.
   for (const control of [select, audio, toggles]) {
     const onEdit = () => {
       runtime.edidDirty.add(input);
@@ -779,7 +779,7 @@ function buildEdidRow(input) {
   return row;
 }
 
-// Подписи строки EDID: вызывается при построении и при смене языка.
+// EDID row labels: called on build and on language change.
 function renderEdidRowLabels(row) {
   row.querySelector("[data-in-label]").textContent = ioName("in", Number(row.dataset.input));
   for (const option of row.querySelectorAll("[data-code] option")) option.textContent = edidName(option.value);
@@ -792,7 +792,7 @@ function renderEdidRowLabels(row) {
   if (row._saved) fillEdidRow(row, row._saved);
 }
 
-// Строки EDID строятся заново только при смене матрицы, иначе пропадает их состояние.
+// EDID rows are rebuilt only when the matrix changes, otherwise their state would be lost.
 function ensureEdidRows(mac) {
   const list = $("edidList");
   if (runtime.renderedMac === mac && list.children.length) return;
@@ -807,26 +807,26 @@ function ensureEdidRows(mac) {
   runtime.renderedMac = mac;
 }
 
-// Сохранённое на матрице состояние строки хранится отдельно от контролов:
-// по нему подсвечиваются несохранённые изменения.
+// The row state saved on the matrix is kept apart from the controls:
+// unsaved changes are highlighted against it.
 function fillEdidRow(row, edid) {
   row._saved = edid;
 
   const summaryText = row.querySelector("[data-summary]");
   summaryText.replaceChildren();
-  // Имя — жирным, остальное берём из шаблона языка: «{name} · audio {audio}» начинается с имени.
+  // The name is bold; the rest comes from the language template: "{name} · audio {audio}" starts with the name.
   summaryText.append(el("b", null, edidName(edid.code)), t("edid.summary", { name: "", audio: edid.audio }));
 
   const tags = row.querySelector("[data-tags]");
   tags.replaceChildren();
   for (const key of FLAG_KEYS) {
-    // Плашка — не чекбокс: атрибут отдельный, иначе её примут за контрол при сборе данных.
+    // The tag is not a checkbox: it has its own attribute, otherwise it would be taken for a control when the data is collected.
     const tag = el("span", `tag ${edid[key] ? "on" : ""}`, t(`flag.${key}`));
     tag.dataset.tag = key;
     tags.append(tag);
   }
 
-  // Контролы трогаем только когда пользователь не правит строку, иначе сотрём его выбор.
+  // Controls are touched only when the user is not editing the row, otherwise their choice would be erased.
   if (!runtime.edidDirty.has(Number(row.dataset.input))) {
     row.querySelector("[data-code]").value = edid.code;
     row.querySelector("[data-audio]").value = edid.audio;
@@ -835,8 +835,8 @@ function fillEdidRow(row, edid) {
   updateDirty(row);
 }
 
-// Оранжевым отмечаются изменённые флаги в верхней строке, контролы и кнопка «Применить».
-// Когда различий нет, строка снова становится «чистой».
+// Changed flags in the top line, the controls and the "Apply" button turn orange.
+// When there are no differences, the row becomes "clean" again.
 function updateDirty(row) {
   const saved = row._saved;
   if (!saved) return;
@@ -896,9 +896,9 @@ async function applyEdid(input, row) {
   }
 }
 
-// ── Сеть ─────────────────────────────────────────────────────────────────────────
+// ── Network ─────────────────────────────────────────────────────────────────────────
 
-// Поля через elements: поле с именем "name" перекрывает свойство form.name.
+// Fields are read through elements: a field named "name" shadows the form.name property.
 function renderNetwork() {
   const live = runtime.live;
   if (!live || runtime.netDirty) return;
@@ -935,7 +935,7 @@ async function saveNetwork(event) {
   button.disabled = true;
   showError("netError", "");
   try {
-    // Отправляем по текущему адресу: новый пока не работает. Ответа устройство обычно не даёт.
+    // Sent to the current address: a new one does not work yet. The device usually sends no answer.
     await sendCommand(device.ip, networkUrl(device.ip), {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -950,8 +950,8 @@ async function saveNetwork(event) {
   }
 }
 
-// После смены адреса матрица переезжает. Пробуем новый адрес несколько раз: устройству
-// нужно время перезапустить сеть. Если не получилось, адрес остаётся в списке как есть.
+// After an address change the matrix moves. We try the new address several times: the device
+// needs time to restart its network. If that fails, the address stays in the list as it is.
 async function followNewAddress(mac, newIp) {
   const device = store.devices[mac];
   if (!device) return;
@@ -972,13 +972,13 @@ async function followNewAddress(mac, newIp) {
         return;
       }
     } catch {
-      // ещё не поднялась: пробуем дальше
+      // is not up yet: keep trying
     }
   }
   showError("netError", t("net.savedNoReply", { ip: newIp }));
 }
 
-// ── Опрос ────────────────────────────────────────────────────────────────────────
+// ── Polling ────────────────────────────────────────────────────────────────────────
 
 function renderAll() {
   const live = runtime.live;
@@ -992,8 +992,8 @@ function renderAll() {
   renderNetwork();
 }
 
-// Опрос шёл к той матрице, которая была активна в момент запуска. Если пользователь
-// уже переключился или сменил адрес, ответ относится к прошлой записи и его нельзя применять.
+// The poll was for the matrix that was active when it started. If the user
+// has already switched or changed the address, the answer belongs to the old record and must not be applied.
 function isStaleResponse(requestedMac, requestedIp) {
   return store.active !== requestedMac || store.devices[requestedMac]?.ip !== requestedIp;
 }
@@ -1015,15 +1015,15 @@ async function refresh() {
     if (isStaleResponse(requestedMac, requestedIp)) return;
     setLink(false, "link.bad");
     setOnline(requestedMac, false);
-    // Сырую ошибку (HTTP 502) не выводим: опрос идёт часто, состояние уже говорит всё.
+    // The raw error (HTTP 502) is not shown: polling runs often and the state already says it all.
     setViewState(runtime.live ? "stale" : "offline");
   }
 }
 
-// Доступность проверяем у всех матриц, а не только у активной: иначе вкладки неактивных
-// никогда не узнают, что устройство пропало. Берём AutoGetRevID — самый короткий ответ.
-// Проверки идут параллельно и мимо очереди: это только чтение, и медленная матрица
-// не должна задерживать остальные.
+// Availability is checked for all matrices, not only the active one: otherwise the tabs of inactive
+// matrices would never learn that a device has gone. We use AutoGetRevID, the shortest answer.
+// The checks run in parallel and outside the queue: they only read, and a slow matrix
+// must not delay the others.
 async function checkPresence() {
   await Promise.all(
     Object.entries(store.devices).map(async ([mac, device]) => {
@@ -1037,25 +1037,25 @@ async function checkPresence() {
       } catch {
         online = false;
       }
-      // Если адрес сменили, пока шла проверка, результат относится к старому адресу.
+      // If the address was changed while the check ran, the result refers to the old address.
       if (store.devices[mac]?.ip !== device.ip) return;
       setOnline(mac, online);
     }),
   );
 }
 
-// ── Поиск матриц в сети ──────────────────────────────────────────────────────────
-// Опрос только чтением (AutoGetRevID, затем AutoGetAllData), параллельно и с коротким таймаутом.
-// Найденная матрица попадает в список только по кнопке «Добавить».
+// ── Network matrix search ──────────────────────────────────────────────────────────
+// Read-only polling (AutoGetRevID, then AutoGetAllData), in parallel and with a short timeout.
+// A found matrix goes into the list only via the "Add" button.
 
-// Браузер держит не больше шести соединений на один адрес, поэтому параллельность меньше:
-// запросы к пустым адресам не должны занимать слоты и отодвигать таймаут живой матрицы.
+// A browser keeps at most six connections per address, so parallelism is lower:
+// requests to empty addresses must not take up the slots and push back the timeout of a live matrix.
 const SCAN_CONCURRENCY = 5;
 const SCAN_TIMEOUT_MS = 2500;
 const SCAN_ERRORS = { badRange: "scan.errBadRange", notPrivate: "scan.errNotPrivate", tooLarge: "scan.errTooLarge" };
 let scanAbort = false;
 
-// Проверка одного адреса: сначала короткий AutoGetRevID, полный конфиг только для матриц.
+// Checking one address: a short AutoGetRevID first, the full config only for matrices.
 async function probeHost(host) {
   const revision = await deviceRequest(host, revisionUrl(host), { queued: false, timeout: SCAN_TIMEOUT_MS });
   if (!revision.ok || !(await revision.text()).startsWith("52=")) return null;
@@ -1084,7 +1084,7 @@ function addScanResult(host, state) {
   $("scanResults").append(item);
 }
 
-// Уже известная матрица (тот же MAC) обновляет свой адрес, новая добавляется.
+// A known matrix (same MAC) gets its address updated; a new one is added.
 async function addFoundDevice(host, state) {
   const existing = store.devices[state.mac] ?? { ui: { edidOpen: [] } };
   store.devices[state.mac] = { ...existing, ip: host, name: state.name };
@@ -1118,7 +1118,7 @@ async function startScan(event) {
   };
   updateStatus();
 
-  // Несколько рабочих тянут адреса из общего счётчика: ограничиваем параллельность.
+  // Several workers take addresses from a shared counter: parallelism is limited.
   const worker = async () => {
     while (!scanAbort && next < hosts.length) {
       const host = hosts[next];
@@ -1127,7 +1127,7 @@ async function startScan(event) {
       try {
         state = await probeHost(host);
       } catch {
-        state = null; // таймаут или не матрица: просто пропускаем адрес
+        state = null; // timeout or not a matrix: just skip the address
       }
       done += 1;
       if (state) {
@@ -1144,7 +1144,7 @@ async function startScan(event) {
   if (!found && !scanAbort) showError("scanError", t("scan.none"));
 }
 
-// ── Язык и часы ──────────────────────────────────────────────────────────────────
+// ── Language and clock ──────────────────────────────────────────────────────────────────
 
 function renderLangButton() {
   const language = currentLanguage();
@@ -1181,7 +1181,7 @@ async function chooseLanguage(code) {
   renderAllLabels();
 }
 
-// Все подписи, которые строятся из JS: при смене языка пересобираем их по тем же функциям.
+// All labels built from JS: on a language change they are rebuilt by the same functions.
 function renderAllLabels() {
   renderLangButton();
   renderLink();
@@ -1197,16 +1197,16 @@ function tickClock() {
   $("clock").textContent = new Date().toLocaleTimeString(currentLanguage().locale);
 }
 
-// Меню подписи закрываем кликом мимо, Escape, прокруткой и изменением окна: иначе оно повисает.
-// Редактор закрывается Escape и кликом по затемнению; Enter в поле тега добавляет тег, а не сохраняет.
+// The label menu closes on a click outside, Escape, scrolling and window resize: otherwise it would hang around.
+// The editor closes on Escape and on a click on the backdrop; Enter in the tag field adds a tag and does not save.
 function bindIoEditor() {
   $("ioMenuEdit").addEventListener("click", () => {
     const target = ioTarget;
     closeIoMenu();
     if (target) openIoEditor(target.kind, target.n);
   });
-  // pointerdown, а не click: после правого клика браузер может прислать click по заголовку,
-  // и меню закрылось бы сразу же после открытия. pointerdown приходит раньше contextmenu.
+  // pointerdown, not click: after a right-click the browser may send a click on the header,
+  // and the menu would close right after opening. pointerdown arrives before contextmenu.
   document.addEventListener("pointerdown", (event) => {
     if (!$("ioMenu").contains(event.target)) closeIoMenu();
   });
@@ -1230,8 +1230,8 @@ function bindIoEditor() {
   });
 }
 
-// Панели EDID и «Сеть» закрыты по умолчанию. Состояние запоминаем отдельно для каждой,
-// на весь браузер: раскладка одна для всех матриц, а не привязана к конкретной.
+// The EDID and Network panels are collapsed by default. Their state is remembered separately for each,
+// for the whole browser: the layout is the same for all matrices, not tied to one.
 function bindCollapsiblePanels() {
   for (const [id, key] of [["edidPanel", "edid"], ["netPanel", "net"]]) {
     const panel = $(id);
@@ -1256,7 +1256,7 @@ function bindLanguageMenu() {
   });
 }
 
-// ── Старт ────────────────────────────────────────────────────────────────────────
+// ── Start ────────────────────────────────────────────────────────────────────────
 
 async function init() {
   await initI18n();
@@ -1280,11 +1280,11 @@ async function init() {
   setInterval(tickClock, 1000);
   tickClock();
   renderTabs();
-  // Опрос запущен всегда: матрицу могут добавить уже после загрузки страницы.
+  // Polling always runs: a matrix may be added after the page has loaded.
   setInterval(refresh, POLL_MS);
   setInterval(checkPresence, POLL_MS);
 
-  // Подписи подгружаем до первой активации: иначе матрица сначала покажет «IN 1» без подписей.
+  // Labels are loaded before the first activation: otherwise the matrix would first show "IN 1" without labels.
   await loadIoConfig();
   renderIoLabels();
 

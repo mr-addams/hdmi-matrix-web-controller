@@ -1,5 +1,5 @@
-# Сборка из исходников для разработки: docker compose -f compose.dev.yaml up -d --build
-# Остальное совпадает с compose.yaml, но образ собирается локально из Dockerfile.
+# Build from source for development: docker compose -f compose.dev.yaml up -d --build
+# Otherwise identical to compose.yaml, but the image is built locally from the Dockerfile.
 services:
   matrix-ui:
     build: .

@@ -1,5 +1,5 @@
-# Релиз: тесты, мультиархитектурный образ в GHCR и GitHub Release. Запускается тегом вида v1.2.3
-# или вручную (тогда публикуются только теги ветки и коммита, без latest и без релиза).
+# Release: tests, a multi-architecture image in GHCR, and a GitHub Release. Runs on a tag such as v1.2.3
+# or manually (then only branch and commit tags are published: no latest tag and no release).
 name: release
 
 on:
@@ -8,7 +8,7 @@ on:
       - "v*.*.*"
   workflow_dispatch:
 
-# По умолчанию — только чтение. Записи выдаём отдельным job, которым она нужна.
+# Read-only by default. Write access is granted per job, only where it is needed.
 permissions:
   contents: read
 
@@ -73,7 +73,7 @@ jobs:
             sleep 1
           done
           test "$code" = "200"
-          # Без входа страница не открывается, с неверным паролем — тоже.
+          # Without sign-in the page must not open, and neither with a wrong password.
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/)" = "303"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/api/config)" = "401"
           docker logs smoke
@@ -103,7 +103,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          # Повторный запуск для уже опубликованного тега не должен падать: релиз уже есть.
+          # A rerun for an already published tag must not fail: the release already exists.
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             echo "релиз ${GITHUB_REF_NAME} уже существует"
           else

@@ -1,5 +1,5 @@
-// hdmi-ui: страница управления HDMI-матрицами одним бинарником. Отдаёт статику, проксирует
-// запросы к матрицам в приватных сетях и хранит подписи и теги. Вход — форма и сессия в cookie.
+// hdmi-ui: web page for controlling HDMI matrices, shipped as one binary. It serves static files, proxies
+// requests to matrices on private networks, and stores labels and tags. Sign-in uses a form and a cookie session.
 package main
 
 import (
@@ -31,8 +31,8 @@ func main() {
 	auth := newAuthenticator(login, password, envOr("COOKIE_SECURE", "") == "true")
 	handler := newServerHandler(auth, &Store{path: configPath}, isPrivateIP, newMatrixTransport())
 
-	// Таймауты намеренно заданы константами, а не через ENV: клиент — одна страница, и менять их
-	// оператору незачем. WriteTimeout покрывает проксирование к матрице с её ожиданием ответа.
+	// Timeouts are constants on purpose, not environment variables: the only client is one page, so there is no need to tune them.
+	// WriteTimeout covers proxied requests, which may wait for a matrix to answer.
 	server := &http.Server{
 		Addr:              listenAddr,
 		Handler:           handler,
@@ -44,8 +44,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// ListenAndServe возвращает ErrServerClosed сразу, как только Shutdown начал работу. Поэтому
-	// ждём явный сигнал о завершении Shutdown: иначе процесс оборвал бы запросы в полёте.
+	// ListenAndServe returns ErrServerClosed as soon as Shutdown starts, so
+	// wait for an explicit signal that Shutdown has finished; otherwise in-flight requests would be cut off.
 	shutdownDone := make(chan struct{})
 	go func() {
 		defer close(shutdownDone)
@@ -67,8 +67,8 @@ func main() {
 	<-shutdownDone
 }
 
-// newServerHandler собирает весь сервер. Вход и выход доступны без сессии, всё остальное
-// пускает только require. Тесты собирают тем же вызовом, что и продакшен.
+// newServerHandler assembles the whole server. Sign-in and sign-out work without a session; everything else
+// goes through require. Tests use this same function, so they exercise the production wiring.
 func newServerHandler(auth *authenticator, store *Store, allowed func(net.IP) bool, transport http.RoundTripper) http.Handler {
 	root := http.NewServeMux()
 	root.HandleFunc("GET /login", auth.loginPage)
@@ -78,7 +78,7 @@ func newServerHandler(auth *authenticator, store *Store, allowed func(net.IP) bo
 	return securityHeaders(root)
 }
 
-// newMux собирает маршруты приложения без входа: его навешивает newServerHandler.
+// newMux builds the application routes without sign-in; newServerHandler wraps them with it.
 func newMux(store *Store, allowed func(net.IP) bool, transport http.RoundTripper) http.Handler {
 	static, err := fs.Sub(staticFiles, "static")
 	if err != nil {

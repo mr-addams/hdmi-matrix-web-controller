@@ -1,5 +1,5 @@
-/* Палитра Tokyo Night: тёмный фон, холодные акценты. Цвета вынесены в переменные,
-   чтобы менять тему одним местом. */
+/* Tokyo Night palette: dark background, cool accents. Colors live in variables,
+   so the theme can be changed in one place. */
 :root {
   --bg: #1a1b26;
   --bg-deep: #16161e;
@@ -33,7 +33,7 @@ body {
 
 .shell { max-width: 1280px; margin: 0 auto; padding: 18px; display: flex; flex-direction: column; gap: var(--gap); }
 
-/* ── Верхняя панель ─────────────────────────────────────────────────────────────── */
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .logo { font-size: 28px; color: var(--purple); text-shadow: 0 0 18px rgba(187, 154, 247, 0.55); }
@@ -54,7 +54,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .pill.bad .dot { background: var(--red); box-shadow: 0 0 10px var(--red); }
 .pill.bad { color: var(--red); }
 
-/* ── Общая раскладка ────────────────────────────────────────────────────────────── */
+/* ── Overall layout ────────────────────────────────────────────────────────────── */
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
@@ -63,7 +63,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
   align-items: start;
 }
 .matrix-panel { grid-area: matrix; }
-/* EDID и «Сеть» — в одном столбце: свёрнутые панели не должны оставлять пустоту между собой. */
+/* EDID and Network share one column: collapsed panels must not leave a gap between them. */
 .side { grid-area: side; display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 
 .panel {
@@ -83,8 +83,8 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .error { color: var(--red); font-size: 13px; min-height: 0; margin: 10px 0 0; }
 .error:empty { display: none; }
 
-/* ── Сворачиваемые панели EDID и «Сеть» ───────────────────────────────────────────── */
-/* Заголовок — это <summary>: клик и Enter раскрывают панель, без своего JS. */
+/* ── Collapsible EDID and Network panels ───────────────────────────────────────────── */
+/* The header is a <summary>: a click or Enter expands the panel, with no JavaScript of its own. */
 .collapsible > summary { list-style: none; cursor: pointer; }
 .collapsible > summary::-webkit-details-marker { display: none; }
 .collapsible > summary::after {
@@ -94,7 +94,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .collapsible:not([open]) > summary { margin-bottom: 0; }
 .collapsible > summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 8px; }
 
-/* ── Матрица ────────────────────────────────────────────────────────────────────── */
+/* ── Matrix ────────────────────────────────────────────────────────────────────── */
 .matrix {
   display: grid;
   grid-template-columns: 84px repeat(8, minmax(0, 1fr));
@@ -104,7 +104,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .matrix .head { font: 11px var(--mono); color: var(--muted); text-align: center; padding-bottom: 2px; }
 .matrix .out { font: 600 13px var(--mono); color: var(--text); white-space: nowrap; }
 .matrix .out small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
-/* Заголовок входа или выхода: «IN n», подпись второй строкой, теги под ней. */
+/* Input or output header: "IN n", the label on the second line, the tags below it. */
 .io-num { display: block; font: 600 11px var(--mono); color: var(--muted); }
 .io-name {
   display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
@@ -144,8 +144,8 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 
 /* ── EDID ───────────────────────────────────────────────────────────────────────── */
 .edid-list { display: flex; flex-direction: column; gap: 10px; }
-/* Каждый вход — <details>: свёрнут до строки-заголовка, раскрывается по клику.
-   Нативный элемент даёт доступность с клавиатуры без своего JS. */
+/* Each input is a <details>: collapsed to its header line, expanded on click.
+   The native element gives keyboard accessibility with no JavaScript of its own. */
 .edid-row {
   border-radius: 12px; background: var(--bg-deep); border: 1px solid var(--border);
   min-width: 0;
@@ -196,7 +196,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 }
 .tag.on { color: var(--green); border-color: rgba(158, 206, 106, 0.55); }
 
-/* Несохранённые изменения: оранжевый — «это ещё не на матрице». */
+/* Unsaved changes: orange means "not on the matrix yet". */
 .tag.changed {
   color: var(--orange); border-color: var(--orange);
   background: rgba(255, 158, 100, 0.12);
@@ -213,7 +213,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
   border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 13px var(--sans);
 }
 .edid-row select:focus, input:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
-/* Чекбоксы внутри тегов не должны наследовать размеры текстовых полей. */
+/* Checkboxes inside tags must not inherit the sizes of text fields. */
 .tag input { width: auto; height: auto; margin: 0 2px 0 0; accent-color: var(--blue); }
 .btn {
   height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border);
@@ -224,7 +224,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .btn-warn { border-color: rgba(255, 158, 100, 0.55); color: var(--orange); }
 .btn-warn:hover:not(:disabled) { border-color: var(--orange); }
 
-/* ── Сеть ───────────────────────────────────────────────────────────────────────── */
+/* ── Network ───────────────────────────────────────────────────────────────────────── */
 .net-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .field input { font-family: var(--mono); }
@@ -235,7 +235,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .warn { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--muted); }
 #macText { font-family: var(--mono); }
 
-/* ── Подписи и теги: меню правого клика и редактор ──────────────────────────────── */
+/* ── Labels and tags: right-click menu and editor ──────────────────────────────── */
 .io-menu {
   position: fixed; z-index: 90; min-width: 160px; padding: 6px; border-radius: 14px;
   background: linear-gradient(160deg, rgba(41, 46, 66, 0.9), rgba(27, 30, 46, 0.86));
@@ -272,7 +272,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 }
 .io-tag-x:hover { color: var(--red); }
 
-/* ── Телефон: всё в один столбец, матрица остаётся 8 колонками ─────────────────── */
+/* ── Phone: everything in one column, the matrix keeps its 8 columns ─────────────────── */
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
@@ -286,7 +286,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
   .matrix { grid-template-columns: 52px repeat(8, minmax(0, 1fr)); gap: 4px; }
   .matrix .out { font-size: 12px; }
   .matrix .out small { display: none; }
-  /* В узкой колонке остаются только точки: полный текст тега — в панели подписей. */
+  /* In a narrow column only the dots remain; the full tag text is in the label editor. */
   .matrix .io-tag-mini .io-tag-text { display: none; }
   .cell { height: 36px; font-size: 13px; border-radius: 8px; }
   .all-row { gap: 4px; }
@@ -299,8 +299,8 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
   .clock { display: none; }
 }
 
-/* ── Несколько матриц, холодный старт и добавление ───────────────────────────────── */
-/* hidden должен побеждать display из классов (например, у .layout). */
+/* ── Several matrices, cold start and adding ───────────────────────────────── */
+/* hidden must win over display set by classes (for example on .layout). */
 [hidden] { display: none !important; }
 
 .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -331,7 +331,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .btn-ghost:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
 .danger-zone { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 
-/* ── Доступность матриц: зелёное свечение — на связи, оранжевое мигание — нет связи ── */
+/* ── Matrix availability: green glow means online, orange blinking means offline ── */
 .tab.online {
   color: var(--green); border-color: rgba(158, 206, 106, 0.7);
   box-shadow: 0 0 12px rgba(158, 206, 106, 0.55);
@@ -341,17 +341,17 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
   box-shadow: 0 0 12px rgba(255, 158, 100, 0.6);
   animation: tab-blink 2.4s ease-in-out infinite;
 }
-/* Плавный пульс: свечение и прозрачность меняются синусоидально, без скачков. */
+/* A smooth pulse: glow and opacity change sinusoidally, with no jumps. */
 @keyframes tab-blink {
   0%, 100% { box-shadow: 0 0 14px rgba(255, 158, 100, 0.7); opacity: 1; }
   50% { box-shadow: 0 0 3px rgba(255, 158, 100, 0.15); opacity: 0.6; }
 }
-/* Для пользователей, которым мигание мешает, индикатор остаётся статичным. */
+/* For users who find blinking distracting, the indicator stays static. */
 @media (prefers-reduced-motion: reduce) {
   .tab.offline { animation: none; }
 }
 
-/* ── Состояния просмотра матрицы: загрузка, нет связи, устаревшие данные ─────────── */
+/* ── Matrix view states: loading, no connection, stale data ─────────── */
 .matrix-panel, .edid-panel { position: relative; }
 .loader {
   position: absolute; inset: 0; z-index: 5; border-radius: var(--radius);
@@ -369,16 +369,16 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 #workspace[data-state="offline"] .loader { display: flex; }
 #workspace[data-state="offline"] .spin { display: none; }
 #workspace[data-state="offline"] .loader-text { color: var(--red); }
-/* Пока данных нет, никаких «зелёных» ячеек от прошлой матрицы не остаётся. */
+/* While there is no data, no "green" cells from the previous matrix remain. */
 #workspace[data-state="loading"] .matrix,
 #workspace[data-state="offline"] .matrix,
 #workspace[data-state="loading"] .edid-list,
 #workspace[data-state="offline"] .edid-list { opacity: 0.25; filter: grayscale(1); pointer-events: none; }
-/* Нет связи, но последние данные ещё есть: показываем их приглушённо. */
+/* No connection, but the last data is still there: show it dimmed. */
 #workspace[data-state="stale"] .matrix,
 #workspace[data-state="stale"] .edid-list { opacity: 0.5; }
 
-/* ── Модальное подтверждение в стиле стекла ─────────────────────────────────────── */
+/* ── Modal confirmation in glass style ─────────────────────────────────────── */
 .modal {
   position: fixed; inset: 0; z-index: 100;
   display: flex; align-items: center; justify-content: center; padding: 16px;
@@ -412,7 +412,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
   .modal, .modal-card { animation: none; }
 }
 
-/* ── Переключатель языка: плашка справа от связи, выпадающий список в стиле стекла ── */
+/* ── Language switcher: a pill to the right of the connection status, a glass-style dropdown ── */
 .lang { position: relative; }
 .logout-form { margin: 0; }
 .lang-btn { gap: 8px; cursor: pointer; }
@@ -439,10 +439,10 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .lang-item .lang-name { flex: 1; }
 .lang-item .lang-code { color: var(--muted); }
 
-/* ── Флаги языков: SVG-файлы из static/flags ─────────────────────────────────────── */
+/* ── Language flags: SVG files from static/flags ─────────────────────────────────────── */
 .flag-img { display: block; width: 22px; height: 15px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15); }
 
-/* ── Поиск матриц в сети ───────────────────────────────────────────────────────── */
+/* ── Network matrix search ───────────────────────────────────────────────────────── */
 .scan { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
 .scan h3 { margin: 0 0 6px; font-size: 14px; color: var(--text); }
 .scan-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
@@ -462,7 +462,7 @@ h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .scan-badge.known { color: var(--muted); }
 .scan-item .btn { height: 32px; padding: 0 12px; }
 
-/* ── Подсказка формата в пустых полях: плейсхолдер виден и читается ─────────────── */
+/* ── Format hint in empty fields: the placeholder is visible and readable ─────────────── */
 input::placeholder {
   color: var(--cyan);
   opacity: 0.9;

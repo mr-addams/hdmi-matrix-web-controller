@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// Интеграционный тест: настоящий HTTP-сервер и файл на диске. Проверяет, что данные переживают
-// перезапуск сервиса — ради этого сервис и существует.
+// Integration test: a real HTTP server and a real file on disk. It checks that data survives
+// a service restart, which is the whole point of the service.
 func TestSettingsSurviveRestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	body := []byte(`{"version":1,"devices":{"` + testMAC + `":{"io":{"out":{"3":{"label":"Проектор","tags":[{"text":"зал"}]}}}}}}`)
@@ -28,7 +28,7 @@ func TestSettingsSurviveRestart(t *testing.T) {
 		t.Fatalf("PUT: код %d", response.StatusCode)
 	}
 
-	// Новый экземпляр сервиса на том же файле — как после docker restart.
+	// A new service instance on the same file, as after docker restart.
 	second := httptest.NewServer(newHandler(&Store{path: path}))
 	defer second.Close()
 	response, err = http.Get(second.URL + "/api/config")

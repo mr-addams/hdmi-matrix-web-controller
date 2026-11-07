@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-// devicePattern разбирает /device/<ip>[:<port>]/<путь>. Порт необязательный, по умолчанию 80.
+// devicePattern parses /device/<ip>[:<port>]/<path>. The port is optional and defaults to 80.
 var devicePattern = regexp.MustCompile(`^/device/(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?(/.*)$`)
 
-// privateNets — приватные сети, куда прокси вообще ходит. Прокси принимает адрес из пути,
-// без этого ограничения контейнер стал бы открытым прокси в любую точку сети.
+// privateNets are the private networks the proxy will reach at all. The proxy takes the address from the path,
+// without this limit the container would become an open proxy to any network address.
 var privateNets = []*net.IPNet{
 	mustCIDR("10.0.0.0/8"),
 	mustCIDR("172.16.0.0/12"),
@@ -30,7 +30,7 @@ func mustCIDR(cidr string) *net.IPNet {
 	return network
 }
 
-// isPrivateIP — адрес из приватной сети. Публичный адрес или IPv6 прокси не обслуживает.
+// isPrivateIP reports whether an address is on a private network. The proxy does not serve public or IPv6 addresses.
 func isPrivateIP(ip net.IP) bool {
 	for _, network := range privateNets {
 		if network.Contains(ip) {
@@ -40,9 +40,9 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// newMatrixTransport задаёт время ожидания под поведение страницы. Соединение с пустым адресом
-// должно отказать быстро: поиск по сети опрашивает много адресов, и медленный отказ замедлил бы
-// весь поиск. Лимит ожидания заголовков ответа: матрица, которая молчит, не держит запрос дольше 5 секунд.
+// newMatrixTransport sets timeouts for how the page behaves. A connection to an empty address must fail fast:
+// network discovery probes many addresses, and a slow failure would slow down
+// the whole scan. The response-header limit means a silent matrix holds a request for at most 5 seconds.
 func newMatrixTransport() *http.Transport {
 	dialer := &net.Dialer{Timeout: time.Second}
 	return &http.Transport{
@@ -53,9 +53,9 @@ func newMatrixTransport() *http.Transport {
 	}
 }
 
-// matrixHeaders — заголовки клиента, которые уходят матрице. Это список, а не запрет: новые
-// заголовки браузера по умолчанию до устройства не доходят. Cookie сессии и логин страницы
-// остаются на сервере и в браузере.
+// matrixHeaders lists the client headers that are forwarded to a matrix. It is an allowlist, not a blocklist: new
+// browser headers never reach the device by default. The session cookie and the page login
+// stay on the server and in the browser.
 var matrixHeaders = []string{"Content-Type", "Accept"}
 
 func forwardedHeaders(in http.Header) http.Header {
@@ -68,8 +68,8 @@ func forwardedHeaders(in http.Header) http.Header {
 	return out
 }
 
-// newDeviceHandler проксирует запрос на матрицу. Повторов нет: ReverseProxy их не делает, а
-// повтор команды переключения мог бы переключить выход второй раз.
+// newDeviceHandler proxies a request to a matrix. It never retries: ReverseProxy does not retry, and a
+// retried switch command could switch an output a second time.
 func newDeviceHandler(allowed func(net.IP) bool, transport http.RoundTripper) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		match := devicePattern.FindStringSubmatch(r.URL.Path)
@@ -88,7 +88,7 @@ func newDeviceHandler(allowed func(net.IP) bool, transport http.RoundTripper) ht
 		}
 		port := 80
 		if match[2] != "" {
-			// Ведущий ноль отсекаем: «080» и «80» — один порт, а два варианта пути нам не нужны.
+			// Leading zeros are rejected: "080" and "80" name the same port, and we do not want two spellings of one path.
 			if len(match[2]) > 1 && match[2][0] == '0' {
 				http.Error(w, "порт с ведущим нулём", http.StatusBadRequest)
 				return
@@ -109,7 +109,7 @@ func newDeviceHandler(allowed func(net.IP) bool, transport http.RoundTripper) ht
 				pr.Out.Header = forwardedHeaders(pr.In.Header)
 			},
 			Transport: transport,
-			// Без буфера: ответы матрицы уходят клиенту сразу, как при proxy_buffering off.
+			// No buffering: matrix responses reach the client at once, like proxy_buffering off.
 			FlushInterval: -1,
 			ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 				log.Printf("матрица %s не ответила: %v", target, err)

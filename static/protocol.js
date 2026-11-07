@@ -1,18 +1,18 @@
-// Протокол матрицы в том виде, как его использует штатный web-UI.
-// Модуль без DOM: его можно проверить в Node отдельно от страницы.
+// The matrix protocol as the device's own web UI uses it.
+// A module without DOM access: it can be tested in Node, apart from the page.
 //
-// Каждая матрица адресуется по своему IP через прокси: /device/<ip>/... Так в
-// интерфейсе может быть сколько угодно матриц, а контейнеру не нужно знать о них заранее.
+// Each matrix is addressed by its IP through the proxy: /device/<ip>/... This way the
+// interface can have any number of matrices, and the container does not need to know them in advance.
 
-// Коды EDID из штатного UI. Копии TV1–TV8 идут как 5–9 и A–C, поэтому
-// «копия TV6» хранится как A, а не 10: так устройство отдаёт и принимает их.
-// Подписи кодов — в языковых файлах, здесь только значения протокола.
+// EDID codes from the device's own UI. Copies of TV1–TV8 use codes 5–9 and A–C, so
+// "copy of TV6" is stored as A, not 10: that is how the device sends and accepts them.
+// Code labels live in the language files; this file holds only the protocol values.
 export const EDID_CODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C"];
 export const AUDIO_MODES = ["2.0", "5.1", "7.1"];
 
 const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
-// Совпадает с правилом в proxy.go: прокси не ходит за пределы приватных сетей.
+// Matches the rule in proxy.go: the proxy does not go beyond private networks.
 export function isPrivateIpv4(ip) {
   const match = IPV4.exec(ip);
   if (!match) return false;
@@ -22,8 +22,8 @@ export function isPrivateIpv4(ip) {
   return a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
 }
 
-// Строка EDID: <код><HDR><3D><30бит><36бит><48бит><аудио>, например 1010001 —
-// 1080P, 3D включён, аудио 2.0. Так устройство хранит и отдаёт её, в одной строке.
+// EDID string: <code><HDR><3D><30-bit><36-bit><48-bit><audio>, for example 1010001 —
+// 1080P, 3D on, audio 2.0. The device stores and returns it as one string.
 export function parseEdid(value) {
   const [code, hdr, threeD, bit30, bit36, bit48, audio] = value.padEnd(7, "0");
   return {
@@ -37,8 +37,8 @@ export function parseEdid(value) {
   };
 }
 
-// Ответ AutoGetAllData: 0E=<MAC>&<IP>&<маска>&<шлюз>&<имя>&<DHCP>&<EDID1..8>&<вход1..8>.
-// Номера входов в ответе с нуля (поле 0 = вход 1), здесь сразу переводим в единицы.
+// AutoGetAllData response: 0E=<MAC>&<IP>&<mask>&<gateway>&<name>&<DHCP>&<EDID1..8>&<input1..8>.
+// Input numbers in the response start at zero (field 0 = input 1); they are converted to one-based here.
 export function parseState(raw) {
   const fields = raw.split("&");
   fields[0] = fields[0].replace(/^0E=/, "");
@@ -55,8 +55,8 @@ export function parseState(raw) {
   };
 }
 
-// Случайный суффикс не даёт браузеру и прокси отдать старый ответ вместо нового.
-// random передаётся снаружи, чтобы тесты получали предсказуемые пути.
+// A random suffix stops the browser and the proxy from returning a stale response instead of a new one.
+// random is passed in from outside so that tests get predictable paths.
 export function deviceBase(ip) {
   return `/device/${ip}`;
 }
@@ -86,8 +86,8 @@ export function networkUrl(ip) {
   return `${deviceBase(ip)}/config.cgi`;
 }
 
-// Поля формы IP-настроек штатного UI: ip, sub, gw, MID, DHCP.
-// DHCP уходит только когда включён: так форма и отправляется в штатном UI.
+// Fields of the IP settings form in the device's own UI: ip, sub, gw, MID, DHCP.
+// DHCP is sent only when enabled: this is how the device's own UI submits the form.
 export function networkBody({ ip, mask, gateway, name, dhcp }) {
   const form = new URLSearchParams({
     ip: ip ?? "",
@@ -99,12 +99,12 @@ export function networkBody({ ip, mask, gateway, name, dhcp }) {
   return form;
 }
 
-// ── Адреса матриц: "ip" или "ip:port". Порт по умолчанию 80 и в строке не пишется. ──
+// ── Matrix addresses: "ip" or "ip:port". The default port is 80 and is not written in the string. ──
 
 export const DEFAULT_PORT = 80;
 
-// Разбор адреса, введённого пользователем. Возвращает { host } или { error: "ip" | "port" }.
-// host — нормализованная строка, которая уходит в /device/<host>/...
+// Parses an address typed by the user. Returns { host } or { error: "ip" | "port" }.
+// host is the normalized string used in /device/<host>/...
 export function parseHost(value) {
   const match = /^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/.exec(value.trim());
   if (!match || !isPrivateIpv4(match[1])) return { error: "ip" };
@@ -113,7 +113,7 @@ export function parseHost(value) {
   return { host: port === DEFAULT_PORT ? match[1] : `${match[1]}:${port}` };
 }
 
-// ── Поиск в сети: CIDR, только приватные сети и не шире /24 ───────────────────────
+// ── Network discovery: CIDR, private networks only, no wider than /24 ───────────────────────
 
 export const SCAN_MAX_PREFIX = 24;
 
@@ -125,8 +125,8 @@ function intToIp(value) {
   return [24, 16, 8, 0].map((shift) => Math.floor(value / 2 ** shift) % 256).join(".");
 }
 
-// Адреса сети для опроса. Сетевой и широковещательный адреса не опрашиваем.
-// Возвращает { hosts } или { error: "badRange" | "notPrivate" | "tooLarge" }.
+// Addresses of the network to probe. The network and broadcast addresses are skipped.
+// Returns { hosts } or { error: "badRange" | "notPrivate" | "tooLarge" }.
 export function cidrHosts(cidr) {
   const match = /^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec(cidr.trim());
   if (!match) return { error: "badRange" };

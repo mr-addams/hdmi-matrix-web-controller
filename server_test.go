@@ -11,8 +11,8 @@ import (
 	"testing"
 )
 
-// TestServerEndToEnd проходит весь путь пользователя через собранный сервер: вход по форме,
-// страница, API настроек, прокси к матрице и выход.
+// TestServerEndToEnd walks the whole user path through the assembled server: sign-in through the form,
+// the page, the settings API, the matrix proxy and sign-out.
 func TestServerEndToEnd(t *testing.T) {
 	matrix, _ := startFakeMatrix(t)
 	auth := newAuthenticator("ops", "s3cret", false)

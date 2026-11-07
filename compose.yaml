@@ -1,19 +1,19 @@
-# Страница управления HDMI-матрицами: один контейнер из опубликованного образа.
-# Версию образа задаёт HDMI_UI_VERSION в .env; обычно её выставляет install.sh.
+# Web controller for HDMI matrices: one container from the published image.
+# The image version comes from HDMI_UI_VERSION in .env; install.sh normally sets it.
 services:
   matrix-ui:
     image: ghcr.io/mr-addams/hdmi-matrix-web-controller:${HDMI_UI_VERSION:-latest}
     ports:
-      # По умолчанию только loopback: у матриц нет аутентификации.
+      # Loopback only by default: the matrices have no authentication.
       - "${MATRIX_UI_BIND:-127.0.0.1}:${MATRIX_UI_PORT:-8080}:8080"
     environment:
       UI_USER: ${UI_USER:-admin}
       UI_PASSWORD: ${UI_PASSWORD:-admin}
     volumes:
-      # Подписи и теги входов и выходов. Named volume: переживает обновление образа.
+      # Labels and tags of inputs and outputs. A named volume survives image upgrades.
       - matrix-data:/data
     restart: unless-stopped
-    # Ограничиваем контейнер: никаких дополнительных привилегий, корень read-only, запись только в /data.
+    # Restrict the container: no extra privileges, read-only root filesystem, writes only to /data.
     read_only: true
     cap_drop:
       - ALL

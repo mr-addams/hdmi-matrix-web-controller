@@ -1,5 +1,5 @@
-# Публикация сайта проекта (docs/) на GitHub Pages через custom workflow.
-# Режим «workflow» вместо legacy: версии экшенов контролируем здесь, а не в managed-workflow GitHub.
+# Publishes the project site (docs/) to GitHub Pages through a custom workflow.
+# Uses the "workflow" mode instead of legacy: action versions are controlled here, not in GitHub's managed workflow.
 name: Pages
 
 on:
